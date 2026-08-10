@@ -11,6 +11,7 @@ import AnalyticsView from './components/AnalyticsView';
 import QuickReviewer from './components/QuickReviewer';
 import AskBeeAnything from './components/AskBeeAnything';
 import OnboardingModal from './components/OnboardingModal';
+import AdminPanel from './components/AdminPanel';
 import { getUserStats, updateUserStats, db } from './services/storageService';
 
 export default function App() {
@@ -146,6 +147,8 @@ export default function App() {
           {activeTab === 'feynman' && <FeynmanStudio />}
 
           {activeTab === 'analytics' && <AnalyticsView userStats={userStats} />}
+
+          {activeTab === 'admin' && <AdminPanel />}
         </>
       )}
 

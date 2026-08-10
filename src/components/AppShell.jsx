@@ -11,14 +11,14 @@ import {
   Zap,
   Volume2,
   VolumeX,
-  Key,
   Search,
   Menu,
   X,
   User,
   Bot,
   Database,
-  ShieldCheck
+  ShieldCheck,
+  Settings
 } from 'lucide-react';
 import BeeAnimatedMascot from './BeeAnimatedMascot';
 import AuthModal from './AuthModal';
@@ -27,7 +27,6 @@ import SupabaseModal from './SupabaseModal';
 import OfflineBanner from './OfflineBanner';
 import MobileBottomNav from './MobileBottomNav';
 import { soundService } from '../services/soundService';
-import { getApiKey, setApiKey } from '../services/geminiService';
 
 export default function AppShell({
   userStats,
@@ -42,21 +41,14 @@ export default function AppShell({
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [soundOn, setSoundOn] = useState(userStats?.soundEnabled ?? true);
-  const [apiKeyModalOpen, setApiKeyModalOpen] = useState(false);
   const [supabaseModalOpen, setSupabaseModalOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
-  const [tempApiKey, setTempApiKey] = useState(getApiKey());
 
   const handleToggleSound = () => {
     const nextState = !soundOn;
     setSoundOn(nextState);
     soundService.setEnabled(nextState);
-  };
-
-  const handleSaveApiKey = () => {
-    setApiKey(tempApiKey);
-    setApiKeyModalOpen(false);
   };
 
   const userXp = userStats?.totalXp || 350;
@@ -70,6 +62,7 @@ export default function AppShell({
     { id: 'leaderboard', label: 'Weekly Leagues', icon: Trophy, badge: userStats?.leagueTier || 'Gold' },
     { id: 'feynman', label: 'Feynman Method', icon: Mic },
     { id: 'analytics', label: 'Exam Analytics', icon: BarChart3 },
+    { id: 'admin', label: 'Admin Panel ⚙️', icon: Settings },
   ];
 
   return (
@@ -203,15 +196,6 @@ export default function AppShell({
           >
             {soundOn ? <Volume2 size={16} /> : <VolumeX size={16} />}
           </button>
-
-          {/* API Key Modal Button */}
-          <button
-            onClick={() => setApiKeyModalOpen(true)}
-            className="btn-icon w-8 h-8 text-amber-400 border-amber-500/30 hover:border-amber-500"
-            title="Gemini API Key"
-          >
-            <Key size={16} />
-          </button>
         </div>
       </header>
 
@@ -305,56 +289,6 @@ export default function AppShell({
           onUserAuthChange(user);
         }}
       />
-
-      {/* Gemini API Key Modal */}
-      {apiKeyModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-          <div className="glass-panel w-full max-w-md p-6 relative border-sky-500/30 shadow-2xl">
-            <button
-              onClick={() => setApiKeyModalOpen(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-white"
-            >
-              <X size={18} />
-            </button>
-
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 rounded-xl bg-sky-500/20 text-sky-400 border border-sky-500/30">
-                <Key size={20} />
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-white">Google Gemini API Key</h3>
-                <p className="text-xs text-slate-400">Power Bee's AI OCR & Study Tutor</p>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <input
-                  type="password"
-                  value={tempApiKey}
-                  onChange={(e) => setTempApiKey(e.target.value)}
-                  placeholder="AIzaSy..."
-                  className="w-full bg-slate-950 border border-slate-800 focus:border-sky-500 rounded-xl px-3.5 py-2 text-xs text-white outline-none font-mono"
-                />
-              </div>
-
-              <div className="p-3 bg-sky-500/10 border border-sky-500/20 rounded-xl flex items-start gap-2 text-xs text-sky-300">
-                <ShieldCheck size={16} className="shrink-0 text-sky-400 mt-0.5" />
-                <span>API Key stored locally in your browser.</span>
-              </div>
-
-              <div className="flex justify-end gap-2">
-                <button onClick={() => setApiKeyModalOpen(false)} className="btn-secondary text-xs py-1.5">
-                  Cancel
-                </button>
-                <button onClick={handleSaveApiKey} className="btn-primary text-xs py-1.5">
-                  Save Key
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
