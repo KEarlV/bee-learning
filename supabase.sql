@@ -100,11 +100,22 @@ CREATE TABLE IF NOT EXISTS public.leaderboard_entries (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 7. Realtime Publication Setup
-ALTER PUBLICATION supabase_realtime ADD TABLE public.user_stats;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.cards;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.decks;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.leaderboard_entries;
+-- 7. Realtime Publication Setup (safe for re-runs — ignores "already a member" error)
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.user_stats;
+EXCEPTION WHEN SQLSTATE '42710' THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.cards;
+EXCEPTION WHEN SQLSTATE '42710' THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.decks;
+EXCEPTION WHEN SQLSTATE '42710' THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.leaderboard_entries;
+EXCEPTION WHEN SQLSTATE '42710' THEN NULL; END $$;
 
 -- 8. Indexes
 CREATE INDEX IF NOT EXISTS idx_leaderboard_city ON public.leaderboard_entries(city_location, weekly_xp DESC);
