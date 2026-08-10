@@ -42,8 +42,9 @@ export default function AdminPanel({ onLogout }) {
     setPendingLoading(true);
     const { data, error } = await supabase
       .from('user_stats')
-      .select('user_id, username, email, city_location, education_level, account_status, registered_at')
-      .order('registered_at', { ascending: false });
+      .select('user_id, username, email, city_location, education_level, account_status, created_at')
+      .order('created_at', { ascending: false });
+    if (error) console.error('fetchPending error:', error);
     if (!error && data) setPendingUsers(data);
     setPendingLoading(false);
   }, [supabase]);
