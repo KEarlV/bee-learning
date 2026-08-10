@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   LayoutDashboard, BookOpen, Sparkles, Trophy, Mic, BarChart3,
-  Flame, Heart, Zap, Volume2, VolumeX, Search, Menu, X, User, Bot
+  Flame, Heart, Zap, Volume2, VolumeX, Search, Menu, X, User, Bot, LogOut
 } from 'lucide-react';
 import BeeAnimatedMascot from './BeeAnimatedMascot';
 import AuthModal from './AuthModal';
@@ -18,6 +18,7 @@ export default function AppShell({
   onOpenQuickReview,
   currentUser,
   onUserAuthChange,
+  onLogout,
   onUpdateUserStats,
   children
 }) {
@@ -25,6 +26,8 @@ export default function AppShell({
   const [soundOn, setSoundOn] = useState(userStats?.soundEnabled ?? true);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
+
+  const isLoggedIn = currentUser?.isAuthenticated && currentUser?.userId !== 'local_user';
 
   const handleToggleSound = () => {
     const nextState = !soundOn;
@@ -108,23 +111,41 @@ export default function AppShell({
             <span>{userStats?.currentStreak || 5}d</span>
           </div>
 
-          {/* User Profile Button */}
-          <button
-            onClick={() => {
-              if (currentUser?.isAuthenticated) setProfileModalOpen(true);
-              else setAuthModalOpen(true);
-            }}
-            className="btn-secondary text-xs py-1 px-2.5 flex items-center gap-2 border-sky-500/30 hover:border-sky-400"
-          >
-            {currentUser?.avatarUrl ? (
-              <img src={currentUser.avatarUrl} alt="Avatar" className="w-6 h-6 rounded-full object-contain bg-slate-900 border border-sky-400 p-0.5" />
-            ) : (
+          {/* User Auth Button — Sign In or User Menu */}
+          {isLoggedIn ? (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setProfileModalOpen(true)}
+                className="btn-secondary text-xs py-1 px-2.5 flex items-center gap-2 border-sky-500/30 hover:border-sky-400 transition-all"
+              >
+                {currentUser?.avatarUrl ? (
+                  <img src={currentUser.avatarUrl} alt="Avatar" className="w-6 h-6 rounded-full object-cover border border-sky-400" />
+                ) : (
+                  <div className="w-6 h-6 rounded-full bg-sky-500/25 border border-sky-400/50 flex items-center justify-center text-[10px] font-bold text-sky-300">
+                    {(currentUser.username || 'B').charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <span className="hidden sm:inline font-bold text-sky-300 max-w-[80px] truncate">
+                  {currentUser.username}
+                </span>
+              </button>
+              <button
+                onClick={() => setAuthModalOpen(true)}
+                className="btn-icon w-8 h-8 text-rose-400 border-rose-500/30 hover:border-rose-400 hover:bg-rose-500/10 transition-all"
+                title="Sign Out"
+              >
+                <LogOut size={15} />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setAuthModalOpen(true)}
+              className="btn-secondary text-xs py-1 px-3 flex items-center gap-2 border-sky-500/30 hover:border-sky-400 transition-all"
+            >
               <User size={15} className="text-sky-400" />
-            )}
-            <span className="hidden sm:inline font-bold text-sky-300">
-              {currentUser?.username || 'Sign In'}
-            </span>
-          </button>
+              <span className="hidden sm:inline font-bold text-sky-300">Sign In</span>
+            </button>
+          )}
 
           {/* Sound Button */}
           <button
@@ -204,7 +225,12 @@ export default function AppShell({
       <AuthModal
         isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}
-        onAuthSuccess={(user) => { onUserAuthChange(user); }}
+        currentUser={currentUser}
+        onAuthSuccess={(user) => { onUserAuthChange(user); setAuthModalOpen(false); }}
+        onLogout={() => {
+          onLogout?.();
+          setAuthModalOpen(false);
+        }}
       />
     </div>
   );

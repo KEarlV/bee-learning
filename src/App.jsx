@@ -27,13 +27,7 @@ export default function App() {
   const [aiTutorOpen, setAiTutorOpen] = useState(false);
   const [cardContextForBee, setCardContextForBee] = useState('');
   const [onboardingOpen, setOnboardingOpen] = useState(false);
-  const [currentUser, setCurrentUser] = useState({
-    userId: 'local_user',
-    username: 'Bee Learner',
-    email: 'student@beestudy.ai',
-    avatarUrl: '/bee_frame_4.png',
-    isAuthenticated: true
-  });
+  const [currentUser, setCurrentUser] = useState(null); // null = not logged in (guest)
 
   // Admin session state (completely separate from user session)
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(
@@ -96,6 +90,10 @@ export default function App() {
     setUserStats(updated);
   };
 
+  const handleLogout = () => {
+    setCurrentUser(null); // Clear user → shows Sign In button
+  };
+
   if (showSplash) {
     return <SplashLoader onFinished={() => setShowSplash(false)} />;
   }
@@ -112,6 +110,7 @@ export default function App() {
       onOpenQuickReview={() => { setActiveSessionDeck(null); setActiveTab('quick'); }}
       currentUser={currentUser}
       onUserAuthChange={(user) => setCurrentUser(user)}
+      onLogout={handleLogout}
       onUpdateUserStats={handleUpdateUserStats}
     >
       {activeSessionDeck ? (

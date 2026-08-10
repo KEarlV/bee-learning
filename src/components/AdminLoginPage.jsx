@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { ShieldCheck, Eye, EyeOff, Lock, X, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ShieldCheck, Eye, EyeOff, Lock, AlertCircle } from 'lucide-react';
 import BeeAnimatedMascot from './BeeAnimatedMascot';
 
 // Admin credentials are NOT visible to regular users.
@@ -13,6 +13,13 @@ export default function AdminLoginPage({ onAdminAuthenticated }) {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    // Trigger entrance animation after mount
+    const t = setTimeout(() => setVisible(true), 30);
+    return () => clearTimeout(t);
+  }, []);
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -21,22 +28,24 @@ export default function AdminLoginPage({ onAdminAuthenticated }) {
 
     setTimeout(() => {
       if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD_HASH) {
-        // Store admin session in sessionStorage (cleared on tab close)
-        sessionStorage.setItem('bee_admin_session', 'true');
-        onAdminAuthenticated(true);
+        // Fade out before switching
+        setVisible(false);
+        setTimeout(() => {
+          sessionStorage.setItem('bee_admin_session', 'true');
+          onAdminAuthenticated(true);
+        }, 250);
       } else {
         setError('Invalid admin credentials. Access denied.');
+        setIsLoading(false);
       }
-      setIsLoading(false);
     }, 600);
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-      {/* Background gradient */}
+    <div className={`min-h-screen bg-slate-950 flex items-center justify-center p-4 transition-opacity duration-500 ${visible ? 'opacity-100' : 'opacity-0'}`}>
       <div className="absolute inset-0 bg-gradient-to-br from-indigo-950/50 via-slate-950 to-slate-950 pointer-events-none" />
 
-      <div className="relative w-full max-w-sm">
+      <div className={`relative w-full max-w-sm transition-all duration-500 ${visible ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-6 scale-95'}`}>
         {/* Panel */}
         <div className="glass-panel border-indigo-500/40 p-8 space-y-6 shadow-2xl">
           {/* Header */}
