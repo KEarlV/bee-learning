@@ -1,52 +1,135 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   ShieldCheck, Server, Users, Database, Sparkles, Activity, FileText,
-  Search, CheckCircle2, XCircle, Clock, Zap, LogOut, UserCheck, UserX
+  Search, CheckCircle2, XCircle, Clock, Zap, LogOut, UserCheck, Loader2, RefreshCw
 } from 'lucide-react';
 import BeeAnimatedMascot from './BeeAnimatedMascot';
-
-const mockPendingUsers = [
-  { id: 'u-101', username: 'Maria_Santos', email: 'maria@dlsu.edu.ph', city: 'Manila, 🇵🇭 Philippines', education: 'College / University', registeredAt: '2026-08-11 00:32:11', status: 'pending' },
-  { id: 'u-102', username: 'Juan_Dela_Cruz', email: 'juan@up.edu.ph', city: 'Quezon City, 🇵🇭 Philippines', education: 'Engineering & Tech', registeredAt: '2026-08-11 00:28:44', status: 'pending' },
-  { id: 'u-103', username: 'Elena_Stanford', email: 'elena@stanford.edu', city: 'New York, 🇺🇸 United States', education: 'Medical / Nursing', registeredAt: '2026-08-10 23:55:02', status: 'pending' },
-];
-
-const mockAuditLogs = [
-  { id: 'log-101', timestamp: '2026-08-11 00:39:12', user: 'Alex_Mastery (Manila)', action: 'Gemini OCR Flashcard Synthesis', category: 'AI Generation', status: 'SUCCESS', tokens: 420 },
-  { id: 'log-102', timestamp: '2026-08-11 00:38:45', user: 'Sophia_Brain (Quezon City)', action: 'Claimed Daily Login Bonus (+50 XP)', category: 'Gamification', status: 'SUCCESS', tokens: 0 },
-  { id: 'log-103', timestamp: '2026-08-11 00:37:10', user: 'Sophia_Brain (QC)', action: 'Feynman Method Evaluation', category: 'Feynman Studio', status: 'SUCCESS', tokens: 280 },
-  { id: 'log-104', timestamp: '2026-08-11 00:35:22', user: 'Kenji_Tokyo (Japan)', action: 'Supabase Realtime User Stats Upsert', category: 'Cloud Sync', status: 'SUCCESS', tokens: 0 },
-  { id: 'log-105', timestamp: '2026-08-11 00:32:05', user: 'Elena_Stanford (US)', action: 'Completed Spaced Repetition Session (12 cards)', category: 'Study Round', status: 'SUCCESS', tokens: 150 },
-  { id: 'log-106', timestamp: '2026-08-11 00:28:40', user: 'Kenji_Tokyo (Japan)', action: 'Ask Bee Q&A Query: "Quantum Physics"', category: 'Ask Bee AI', status: 'SUCCESS', tokens: 360 },
-];
+import { getSupabaseClient } from '../services/supabaseService';
 
 export default function AdminPanel({ onLogout }) {
-  const [pendingUsers, setPendingUsers] = useState(mockPendingUsers);
-  const [filterCategory, setFilterCategory] = useState('ALL');
-  const [searchQuery, setSearchQuery] = useState('');
   const [activeSection, setActiveSection] = useState('overview');
 
-  const handleApprove = (userId) => {
-    setPendingUsers((prev) => prev.map((u) => u.id === userId ? { ...u, status: 'approved' } : u));
+  // ── Overview stats ───────────────────────────────────────────
+  const [stats, setStats] = useState({ total: 0, pending: 0, approved: 0 });
+
+  // ── Pending users ────────────────────────────────────────────
+  const [pendingUsers, setPendingUsers] = useState([]);
+  const [pendingLoading, setPendingLoading] = useState(true);
+
+  // ── Audit / activity logs ────────────────────────────────────
+  const [logs, setLogs] = useState([]);
+  const [logsLoading, setLogsLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const supabase = getSupabaseClient();
+
+  // ── Fetch overview stats ─────────────────────────────────────
+  const fetchStats = useCallback(async () => {
+    if (!supabase) return;
+    const { data } = await supabase.from('user_stats').select('account_status');
+    if (data) {
+      setStats({
+        total: data.length,
+        pending: data.filter((u) => u.account_status === 'pending').length,
+        approved: data.filter((u) => u.account_status === 'approved').length,
+      });
+    }
+  }, [supabase]);
+
+  // ── Fetch pending users ──────────────────────────────────────
+  const fetchPending = useCallback(async () => {
+    if (!supabase) return;
+    setPendingLoading(true);
+    const { data, error } = await supabase
+      .from('user_stats')
+      .select('user_id, username, email, city_location, education_level, account_status, registered_at')
+      .order('registered_at', { ascending: false });
+    if (!error && data) setPendingUsers(data);
+    setPendingLoading(false);
+  }, [supabase]);
+
+  // ── Fetch activity logs ──────────────────────────────────────
+  const fetchLogs = useCallback(async () => {
+    if (!supabase) return;
+    setLogsLoading(true);
+    const { data, error } = await supabase
+      .from('activity_logs')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(100);
+    if (!error && data) setLogs(data);
+    setLogsLoading(false);
+  }, [supabase]);
+
+  // ── Initial load ─────────────────────────────────────────────
+  useEffect(() => {
+    fetchStats();
+    fetchPending();
+    fetchLogs();
+  }, [fetchStats, fetchPending, fetchLogs]);
+
+  // ── Realtime subscriptions ───────────────────────────────────
+  useEffect(() => {
+    if (!supabase) return;
+
+    const usersSub = supabase
+      .channel('admin-users-watch')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_stats' }, () => {
+        fetchStats();
+        fetchPending();
+      })
+      .subscribe();
+
+    const logsSub = supabase
+      .channel('admin-logs-watch')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activity_logs' }, (payload) => {
+        setLogs((prev) => [payload.new, ...prev]);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(usersSub);
+      supabase.removeChannel(logsSub);
+    };
+  }, [supabase, fetchStats, fetchPending]);
+
+  // ── Approve / Reject handlers ────────────────────────────────
+  const handleApprove = async (userId) => {
+    if (!supabase) return;
+    await supabase
+      .from('user_stats')
+      .update({ account_status: 'approved', approved_at: new Date().toISOString() })
+      .eq('user_id', userId);
+    // Realtime will refresh, but also update local state immediately
+    setPendingUsers((prev) =>
+      prev.map((u) => (u.user_id === userId ? { ...u, account_status: 'approved' } : u))
+    );
+    fetchStats();
   };
 
-  const handleReject = (userId) => {
-    setPendingUsers((prev) => prev.map((u) => u.id === userId ? { ...u, status: 'rejected' } : u));
+  const handleReject = async (userId) => {
+    if (!supabase) return;
+    await supabase
+      .from('user_stats')
+      .update({ account_status: 'rejected' })
+      .eq('user_id', userId);
+    setPendingUsers((prev) =>
+      prev.map((u) => (u.user_id === userId ? { ...u, account_status: 'rejected' } : u))
+    );
+    fetchStats();
   };
 
-  const filteredLogs = mockAuditLogs.filter((log) => {
-    const matchesCategory = filterCategory === 'ALL' || log.category === filterCategory;
-    const matchesSearch =
-      log.user.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.action.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
-  });
+  const filteredLogs = logs.filter((log) =>
+    (log.username || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (log.action || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (log.category || '').toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
-  const pendingCount = pendingUsers.filter((u) => u.status === 'pending').length;
+  const pendingCount = pendingUsers.filter((u) => u.account_status === 'pending').length;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans select-none">
-      {/* Admin Topbar */}
+      {/* Topbar */}
       <header className="h-14 bg-slate-900/90 backdrop-blur-xl border-b border-slate-800/80 px-6 flex items-center justify-between z-40">
         <div className="flex items-center gap-3">
           <div className="p-1.5 rounded-lg bg-indigo-500/20 border border-indigo-500/30">
@@ -54,26 +137,30 @@ export default function AdminPanel({ onLogout }) {
           </div>
           <div>
             <span className="font-extrabold text-sm text-white font-display">BEE AI — Admin Control Panel</span>
-            <span className="text-[10px] text-slate-400 block">System oversight, user approvals & audit logs</span>
+            <span className="text-[10px] text-slate-400 block">Real-time oversight · User approvals · Audit logs</span>
           </div>
         </div>
         <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-full border border-emerald-500/20">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block" />
+            LIVE
+          </div>
           <BeeAnimatedMascot size="sm" animated={true} />
           <button
             onClick={onLogout}
             className="flex items-center gap-1.5 text-xs text-rose-400 hover:text-rose-300 border border-rose-500/30 hover:border-rose-400 px-3 py-1.5 rounded-xl transition-all"
           >
-            <LogOut size={14} /> Logout Admin
+            <LogOut size={14} /> Logout
           </button>
         </div>
       </header>
 
-      {/* Tab Navigation */}
+      {/* Tabs */}
       <div className="border-b border-slate-800 bg-slate-900/50 px-6 flex gap-1">
         {[
           { id: 'overview', label: '📊 Overview' },
           { id: 'approvals', label: `👤 User Approvals${pendingCount > 0 ? ` (${pendingCount})` : ''}` },
-          { id: 'logs', label: '📋 Audit Logs' },
+          { id: 'logs', label: '📋 Activity Logs' },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -91,51 +178,36 @@ export default function AdminPanel({ onLogout }) {
 
       <div className="max-w-6xl mx-auto p-6 space-y-6">
 
-        {/* OVERVIEW TAB */}
+        {/* ── OVERVIEW ── */}
         {activeSection === 'overview' && (
           <div className="space-y-5">
             <div className="glass-panel p-5 border-indigo-500/30 flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-bold text-white font-display">System Admin & Accounting Panel</h2>
-                <p className="text-xs text-slate-400 mt-0.5">Oversee app usage analytics, Gemini AI token consumption, and Supabase audit logs.</p>
+                <p className="text-xs text-slate-400 mt-0.5">Live Supabase data — updates in real-time as users interact.</p>
               </div>
               <span className="text-[9px] font-extrabold uppercase px-2 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                 SYSTEM ONLINE
               </span>
             </div>
 
-            {/* Analytics Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
               <div className="glass-panel p-4 space-y-2 border-sky-500/30">
-                <div className="flex items-center gap-2 text-xs font-bold text-sky-400 uppercase">
-                  <Users size={15} /> Total Users
-                </div>
-                <p className="text-3xl font-extrabold text-white font-display">1,240</p>
-                <span className="text-[10px] text-emerald-400 font-semibold bg-emerald-500/10 px-2 py-0.5 rounded-full inline-block">+14% this week</span>
+                <div className="flex items-center gap-2 text-xs font-bold text-sky-400 uppercase"><Users size={15} /> Total Users</div>
+                <p className="text-3xl font-extrabold text-white font-display">{stats.total}</p>
+                <span className="text-[10px] text-sky-300 font-semibold bg-sky-500/10 px-2 py-0.5 rounded-full inline-block">Supabase Live</span>
               </div>
 
               <div className="glass-panel p-4 space-y-2 border-amber-500/30">
-                <div className="flex items-center gap-2 text-xs font-bold text-amber-400 uppercase">
-                  <Clock size={15} /> Pending Approvals
-                </div>
-                <p className="text-3xl font-extrabold text-white font-display">{pendingCount}</p>
+                <div className="flex items-center gap-2 text-xs font-bold text-amber-400 uppercase"><Clock size={15} /> Pending Approvals</div>
+                <p className="text-3xl font-extrabold text-white font-display">{stats.pending}</p>
                 <span className="text-[10px] text-amber-300 font-semibold bg-amber-500/10 px-2 py-0.5 rounded-full inline-block">Awaiting review</span>
               </div>
 
-              <div className="glass-panel p-4 space-y-2 border-indigo-500/30">
-                <div className="flex items-center gap-2 text-xs font-bold text-indigo-400 uppercase">
-                  <Activity size={15} /> Cards Reviewed Today
-                </div>
-                <p className="text-3xl font-extrabold text-white font-display">18,450</p>
-                <span className="text-[10px] text-indigo-300 font-semibold bg-indigo-500/10 px-2 py-0.5 rounded-full inline-block">SM-2 Memory Matrix</span>
-              </div>
-
-              <div className="glass-panel p-4 space-y-2 border-purple-500/30">
-                <div className="flex items-center gap-2 text-xs font-bold text-purple-400 uppercase">
-                  <Sparkles size={15} /> Gemini Tokens Used
-                </div>
-                <p className="text-3xl font-extrabold text-white font-display">1.2M</p>
-                <span className="text-[10px] text-purple-300 font-semibold bg-purple-500/10 px-2 py-0.5 rounded-full inline-block">Gemini 2.5-Flash</span>
+              <div className="glass-panel p-4 space-y-2 border-emerald-500/30">
+                <div className="flex items-center gap-2 text-xs font-bold text-emerald-400 uppercase"><UserCheck size={15} /> Approved Users</div>
+                <p className="text-3xl font-extrabold text-white font-display">{stats.approved}</p>
+                <span className="text-[10px] text-emerald-300 font-semibold bg-emerald-500/10 px-2 py-0.5 rounded-full inline-block">Active access</span>
               </div>
             </div>
 
@@ -164,56 +236,76 @@ export default function AdminPanel({ onLogout }) {
           </div>
         )}
 
-        {/* USER APPROVALS TAB */}
+        {/* ── USER APPROVALS ── */}
         {activeSection === 'approvals' && (
-          <div className="space-y-4">
-            <div className="glass-panel p-5 border-amber-500/30">
-              <div className="flex items-center gap-2 mb-4">
+          <div className="glass-panel p-5 border-amber-500/30 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
                 <UserCheck className="text-amber-400" size={20} />
-                <h3 className="text-base font-bold text-white font-display">New User Registration Approvals</h3>
-                <span className="text-[10px] font-bold text-amber-400 bg-amber-500/15 px-2 py-0.5 rounded-full border border-amber-500/30">
-                  {pendingCount} PENDING
-                </span>
+                <h3 className="text-base font-bold text-white font-display">New User Registrations</h3>
+                {pendingCount > 0 && (
+                  <span className="text-[10px] font-bold text-amber-400 bg-amber-500/15 px-2 py-0.5 rounded-full border border-amber-500/30">
+                    {pendingCount} PENDING
+                  </span>
+                )}
               </div>
-              <p className="text-xs text-slate-400 mb-4">
-                New users who register are blocked from accessing the app until approved. Review and approve or reject their applications below.
-              </p>
+              <button onClick={fetchPending} className="btn-icon w-7 h-7 text-slate-400 hover:text-slate-200">
+                <RefreshCw size={14} />
+              </button>
+            </div>
+            <p className="text-xs text-slate-400">
+              Users who register are <strong className="text-amber-300">blocked</strong> until you approve them. Their data comes live from Supabase.
+            </p>
 
+            {pendingLoading ? (
+              <div className="flex items-center justify-center py-10 gap-2 text-slate-400 text-xs">
+                <Loader2 size={16} className="animate-spin" /> Loading from Supabase...
+              </div>
+            ) : pendingUsers.length === 0 ? (
+              <div className="text-center py-10 text-slate-500 text-sm">No registered users yet.</div>
+            ) : (
               <div className="space-y-3">
                 {pendingUsers.map((user) => (
-                  <div key={user.id} className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3.5 rounded-xl border transition-all ${
-                    user.status === 'approved' ? 'bg-emerald-500/5 border-emerald-500/30' :
-                    user.status === 'rejected' ? 'bg-rose-500/5 border-rose-500/20 opacity-60' :
-                    'bg-slate-900/60 border-slate-800 hover:border-slate-700'
-                  }`}>
+                  <div
+                    key={user.user_id}
+                    className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3.5 rounded-xl border transition-all ${
+                      user.account_status === 'approved' ? 'bg-emerald-500/5 border-emerald-500/30' :
+                      user.account_status === 'rejected' ? 'bg-rose-500/5 border-rose-500/20 opacity-60' :
+                      'bg-slate-900/60 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-full bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-sm font-bold text-indigo-300">
-                        {user.username.charAt(0)}
+                        {(user.username || '?').charAt(0).toUpperCase()}
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-bold text-white">{user.username}</span>
+                          <span className="text-sm font-bold text-white">{user.username || '—'}</span>
                           <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full ${
-                            user.status === 'approved' ? 'bg-emerald-500/20 text-emerald-400' :
-                            user.status === 'rejected' ? 'bg-rose-500/20 text-rose-400' :
+                            user.account_status === 'approved' ? 'bg-emerald-500/20 text-emerald-400' :
+                            user.account_status === 'rejected' ? 'bg-rose-500/20 text-rose-400' :
                             'bg-amber-500/20 text-amber-400'
-                          }`}>{user.status}</span>
+                          }`}>{user.account_status}</span>
                         </div>
-                        <div className="text-[10px] text-slate-400">{user.email} · {user.city} · {user.education}</div>
-                        <div className="text-[10px] text-slate-600">Registered: {user.registeredAt}</div>
+                        <div className="text-[10px] text-slate-400">
+                          {user.email || 'No email'} · {user.city_location || '—'} · {user.education_level || '—'}
+                        </div>
+                        <div className="text-[10px] text-slate-600">
+                          Registered: {user.registered_at ? new Date(user.registered_at).toLocaleString() : '—'}
+                        </div>
                       </div>
                     </div>
 
-                    {user.status === 'pending' && (
+                    {user.account_status === 'pending' && (
                       <div className="flex items-center gap-2 shrink-0">
                         <button
-                          onClick={() => handleApprove(user.id)}
+                          onClick={() => handleApprove(user.user_id)}
                           className="flex items-center gap-1.5 text-xs font-bold text-emerald-400 border border-emerald-500/40 hover:border-emerald-400 hover:bg-emerald-500/10 px-3 py-1.5 rounded-xl transition-all"
                         >
                           <CheckCircle2 size={14} /> Approve
                         </button>
                         <button
-                          onClick={() => handleReject(user.id)}
+                          onClick={() => handleReject(user.user_id)}
                           className="flex items-center gap-1.5 text-xs font-bold text-rose-400 border border-rose-500/40 hover:border-rose-400 hover:bg-rose-500/10 px-3 py-1.5 rounded-xl transition-all"
                         >
                           <XCircle size={14} /> Reject
@@ -221,92 +313,114 @@ export default function AdminPanel({ onLogout }) {
                       </div>
                     )}
 
-                    {user.status !== 'pending' && (
-                      <span className={`text-xs font-bold flex items-center gap-1 ${user.status === 'approved' ? 'text-emerald-400' : 'text-rose-400'}`}>
-                        {user.status === 'approved' ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
-                        {user.status === 'approved' ? 'Access Granted' : 'Access Denied'}
+                    {user.account_status !== 'pending' && (
+                      <span className={`text-xs font-bold flex items-center gap-1 ${user.account_status === 'approved' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        {user.account_status === 'approved' ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
+                        {user.account_status === 'approved' ? 'Access Granted' : 'Access Denied'}
                       </span>
                     )}
                   </div>
                 ))}
               </div>
-            </div>
+            )}
           </div>
         )}
 
-        {/* AUDIT LOGS TAB */}
+        {/* ── ACTIVITY LOGS ── */}
         {activeSection === 'logs' && (
           <div className="glass-panel p-5 space-y-4 border-slate-800">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <FileText className="text-sky-400" size={20} />
-                <h3 className="text-base font-bold text-white font-display">System Audit & Activity Logs</h3>
+                <h3 className="text-base font-bold text-white font-display">Activity Logs</h3>
+                <div className="flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block" />
+                  Live
+                </div>
               </div>
-
               <div className="flex items-center gap-2 w-full sm:w-auto">
-                <div className="relative flex-1 sm:w-48">
+                <div className="relative flex-1 sm:w-56">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={14} />
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search logs..."
+                    placeholder="Search user, action..."
                     className="w-full bg-slate-950 border border-slate-800 focus:border-sky-500 rounded-xl pl-8 pr-3 py-1.5 text-xs text-white outline-none"
                   />
                 </div>
-                <select
-                  value={filterCategory}
-                  onChange={(e) => setFilterCategory(e.target.value)}
-                  className="bg-slate-950 border border-slate-800 focus:border-sky-500 rounded-xl px-2.5 py-1.5 text-xs text-slate-200 outline-none"
-                >
-                  <option value="ALL">All Categories</option>
-                  <option value="AI Generation">AI Generation</option>
-                  <option value="Feynman Studio">Feynman Studio</option>
-                  <option value="Ask Bee AI">Ask Bee AI</option>
-                  <option value="Gamification">Gamification</option>
-                  <option value="Cloud Sync">Cloud Sync</option>
-                  <option value="Study Round">Study Round</option>
-                </select>
+                <button onClick={fetchLogs} className="btn-icon w-7 h-7 text-slate-400 hover:text-slate-200">
+                  <RefreshCw size={14} />
+                </button>
               </div>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs text-slate-300 border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-800 text-slate-400 uppercase text-[10px] font-bold tracking-wider bg-slate-900/60">
-                    <th className="p-3">Log ID & Timestamp</th>
-                    <th className="p-3">User Profile</th>
-                    <th className="p-3">Category</th>
-                    <th className="p-3">Action</th>
-                    <th className="p-3">Tokens</th>
-                    <th className="p-3 text-right">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60">
-                  {filteredLogs.map((log) => (
-                    <tr key={log.id} className="hover:bg-slate-900/50 transition-colors">
-                      <td className="p-3">
-                        <div className="font-mono text-white font-bold">{log.id}</div>
-                        <div className="text-[10px] text-slate-500">{log.timestamp}</div>
-                      </td>
-                      <td className="p-3 font-semibold text-slate-200">{log.user}</td>
-                      <td className="p-3">
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20">
-                          {log.category}
-                        </span>
-                      </td>
-                      <td className="p-3 text-slate-300">{log.action}</td>
-                      <td className="p-3 font-mono text-purple-300">{log.tokens ? `${log.tokens} tk` : '-'}</td>
-                      <td className="p-3 text-right">
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                          <CheckCircle2 size={12} /> {log.status}
-                        </span>
-                      </td>
+            {logsLoading ? (
+              <div className="flex items-center justify-center py-10 gap-2 text-slate-400 text-xs">
+                <Loader2 size={16} className="animate-spin" /> Loading logs from Supabase...
+              </div>
+            ) : filteredLogs.length === 0 ? (
+              <div className="text-center py-10 space-y-2">
+                <p className="text-slate-500 text-sm">No activity logs yet.</p>
+                <p className="text-slate-600 text-xs">
+                  To enable logging, create an <code className="text-sky-400">activity_logs</code> table in Supabase.<br />
+                  See the SQL below:
+                </p>
+                <pre className="text-left bg-slate-900 border border-slate-800 rounded-xl p-3 text-[10px] text-slate-400 inline-block mt-2">
+{`CREATE TABLE public.activity_logs (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID,
+  username VARCHAR(100),
+  action TEXT,
+  category VARCHAR(100),
+  tokens_used INT DEFAULT 0,
+  status VARCHAR(30) DEFAULT 'SUCCESS',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER PUBLICATION supabase_realtime ADD TABLE public.activity_logs;`}
+                </pre>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-slate-300 border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-800 text-slate-400 uppercase text-[10px] font-bold tracking-wider bg-slate-900/60">
+                      <th className="p-3">Timestamp</th>
+                      <th className="p-3">User</th>
+                      <th className="p-3">Category</th>
+                      <th className="p-3">Action</th>
+                      <th className="p-3">Tokens</th>
+                      <th className="p-3 text-right">Status</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60">
+                    {filteredLogs.map((log) => (
+                      <tr key={log.id} className="hover:bg-slate-900/50 transition-colors">
+                        <td className="p-3 text-[10px] text-slate-500 whitespace-nowrap">{new Date(log.created_at).toLocaleString()}</td>
+                        <td className="p-3 font-semibold text-slate-200 whitespace-nowrap">{log.username || '—'}</td>
+                        <td className="p-3">
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20 whitespace-nowrap">
+                            {log.category || '—'}
+                          </span>
+                        </td>
+                        <td className="p-3 text-slate-300">{log.action || '—'}</td>
+                        <td className="p-3 font-mono text-purple-300">{log.tokens_used ? `${log.tokens_used} tk` : '—'}</td>
+                        <td className="p-3 text-right">
+                          <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            log.status === 'SUCCESS'
+                              ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                              : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
+                          }`}>
+                            {log.status === 'SUCCESS' ? <CheckCircle2 size={11} /> : <XCircle size={11} />}
+                            {log.status || 'SUCCESS'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
       </div>
