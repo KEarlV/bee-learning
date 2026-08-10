@@ -4,7 +4,7 @@ import {
   Search, CheckCircle2, XCircle, Clock, Zap, LogOut, UserCheck, Loader2, RefreshCw
 } from 'lucide-react';
 import BeeAnimatedMascot from './BeeAnimatedMascot';
-import { getSupabaseClient } from '../services/supabaseService';
+import { getAdminSupabaseClient } from '../services/supabaseService';
 
 export default function AdminPanel({ onLogout }) {
   const [activeSection, setActiveSection] = useState('overview');
@@ -21,7 +21,7 @@ export default function AdminPanel({ onLogout }) {
   const [logsLoading, setLogsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const supabase = getSupabaseClient();
+  const supabase = getAdminSupabaseClient();
 
   // ── Fetch overview stats ─────────────────────────────────────
   const fetchStats = useCallback(async () => {

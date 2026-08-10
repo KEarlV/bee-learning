@@ -1,39 +1,48 @@
 import { createClient } from '@supabase/supabase-js';
 
-const DEFAULT_SUPABASE_URL = 'https://wfhemonjldamzszunorg.supabase.co';
-const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_lCJqQ_DwXn_N9s3axv0GQ_E1aBc';
+const SUPABASE_URL = 'https://wfhemonjldamzszunorg.supabase.co';
 
-const SUPABASE_URL_KEY = 'gizmo_supabase_url';
-const SUPABASE_ANON_KEY = 'gizmo_supabase_anon_key';
+// Anon key — safe for regular users (respects RLS)
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmaGVtb25qbGRhbXpzenVub3JnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYzNzIzNjIsImV4cCI6MjEwMTk0ODM2Mn0.d9AuQ9-ykne0KTNmr1rsWFLYXd7Pd0rIbiYYKR48kBk';
+
+// Service role key — bypasses RLS, ONLY used in Admin Panel (never exposed to users)
+const SUPABASE_SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmaGVtb25qbGRhbXpzenVub3JnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NjM3MjM2MiwiZXhwIjoyMTAxOTQ4MzYyfQ.2vmkTpAt_tSvCqXR36TcoxWK-beKBrvsh9cclvFffbE';
 
 let supabaseInstance = null;
+let adminSupabaseInstance = null;
 
-export function getSupabaseCredentials() {
-  const url = localStorage.getItem(SUPABASE_URL_KEY) || import.meta.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL;
-  const anonKey = localStorage.getItem(SUPABASE_ANON_KEY) || import.meta.env.VITE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY;
-  return { url, anonKey };
-}
-
-export function setSupabaseCredentials(url, anonKey) {
-  localStorage.setItem(SUPABASE_URL_KEY, url);
-  localStorage.setItem(SUPABASE_ANON_KEY, anonKey);
-  supabaseInstance = null;
-}
-
+// Regular user client — uses anon key, respects RLS policies
 export function getSupabaseClient() {
   if (supabaseInstance) return supabaseInstance;
-
-  const { url, anonKey } = getSupabaseCredentials();
-  if (url && anonKey) {
-    try {
-      supabaseInstance = createClient(url, anonKey);
-      return supabaseInstance;
-    } catch (e) {
-      console.warn('Supabase client creation error:', e);
-    }
+  try {
+    supabaseInstance = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    return supabaseInstance;
+  } catch (e) {
+    console.warn('Supabase client creation error:', e);
+    return null;
   }
-  return null;
 }
+
+// Admin-only client — uses service_role key, bypasses RLS
+// Only called from AdminPanel — never used in user-facing components
+export function getAdminSupabaseClient() {
+  if (adminSupabaseInstance) return adminSupabaseInstance;
+  try {
+    adminSupabaseInstance = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    });
+    return adminSupabaseInstance;
+  } catch (e) {
+    console.warn('Admin Supabase client creation error:', e);
+    return null;
+  }
+}
+
+// Legacy helpers kept for backward compatibility
+export function getSupabaseCredentials() {
+  return { url: SUPABASE_URL, anonKey: SUPABASE_ANON_KEY };
+}
+export function setSupabaseCredentials() {} // no-op — credentials are now fixed
 
 // 1. Subscribe to Real-Time Supabase Changes
 export function subscribeToRealtimeChanges(onTableChange) {
