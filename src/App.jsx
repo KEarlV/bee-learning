@@ -11,11 +11,15 @@ import AnalyticsView from './components/AnalyticsView';
 import QuickReviewer from './components/QuickReviewer';
 import AskBeeAnything from './components/AskBeeAnything';
 import OnboardingModal from './components/OnboardingModal';
+import AdminLoginPage from './components/AdminLoginPage';
 import AdminPanel from './components/AdminPanel';
 import { getUserStats, updateUserStats, db } from './services/storageService';
 
+// Check if current URL is the admin route
+const isAdminRoute = window.location.pathname === '/admin' || window.location.hash === '#/admin';
+
 export default function App() {
-  const [showSplash, setShowSplash] = useState(true);
+  const [showSplash, setShowSplash] = useState(!isAdminRoute);
   const [userStats, setUserStats] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [activeSessionDeck, setActiveSessionDeck] = useState(null);
@@ -31,14 +35,37 @@ export default function App() {
     isAuthenticated: true
   });
 
+  // Admin session state (completely separate from user session)
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(
+    () => sessionStorage.getItem('bee_admin_session') === 'true'
+  );
+
   useEffect(() => {
-    async function loadData() {
-      const stats = await getUserStats();
-      setUserStats(stats);
+    if (!isAdminRoute) {
+      getUserStats().then((stats) => setUserStats(stats));
     }
-    loadData();
   }, []);
 
+  // ---- ADMIN ROUTE ----
+  if (isAdminRoute) {
+    if (!isAdminAuthenticated) {
+      return (
+        <AdminLoginPage
+          onAdminAuthenticated={(val) => setIsAdminAuthenticated(val)}
+        />
+      );
+    }
+    return (
+      <AdminPanel
+        onLogout={() => {
+          sessionStorage.removeItem('bee_admin_session');
+          setIsAdminAuthenticated(false);
+        }}
+      />
+    );
+  }
+
+  // ---- REGULAR USER APP ----
   const handleStartSession = async (deck) => {
     const cards = await db.cards.where('deckId').equals(deck.id).toArray();
     setActiveSessionDeck(deck);
@@ -81,21 +108,12 @@ export default function App() {
         setActiveSessionDeck(null);
         setActiveTab(tab);
       }}
-      onOpenScan={() => {
-        setActiveSessionDeck(null);
-        setActiveTab('studio');
-      }}
-      onOpenQuickReview={() => {
-        setActiveSessionDeck(null);
-        setActiveTab('quick');
-      }}
+      onOpenScan={() => { setActiveSessionDeck(null); setActiveTab('studio'); }}
+      onOpenQuickReview={() => { setActiveSessionDeck(null); setActiveTab('quick'); }}
       currentUser={currentUser}
-      onUserAuthChange={(user) => {
-        setCurrentUser(user);
-      }}
+      onUserAuthChange={(user) => setCurrentUser(user)}
       onUpdateUserStats={handleUpdateUserStats}
     >
-      {/* Active Study Arena View */}
       {activeSessionDeck ? (
         <StudyArena
           deck={activeSessionDeck}
@@ -115,7 +133,6 @@ export default function App() {
               onClaimXp={handleClaimXp}
             />
           )}
-
           {activeTab === 'library' && (
             <Dashboard
               userStats={userStats}
@@ -125,34 +142,21 @@ export default function App() {
               onClaimXp={handleClaimXp}
             />
           )}
-
-          {activeTab === 'quick' && (
-            <QuickReviewer onClose={() => setActiveTab('dashboard')} />
-          )}
-
+          {activeTab === 'quick' && <QuickReviewer onClose={() => setActiveTab('dashboard')} />}
           {activeTab === 'askbee' && <AskBeeAnything />}
-
           {activeTab === 'studio' && (
             <FileScanner
               onDeckCreated={(newDeckId) => {
-                db.decks.get(newDeckId).then((d) => {
-                  if (d) handleStartSession(d);
-                });
+                db.decks.get(newDeckId).then((d) => { if (d) handleStartSession(d); });
               }}
             />
           )}
-
           {activeTab === 'leaderboard' && <LeaderboardView />}
-
           {activeTab === 'feynman' && <FeynmanStudio />}
-
           {activeTab === 'analytics' && <AnalyticsView userStats={userStats} />}
-
-          {activeTab === 'admin' && <AdminPanel />}
         </>
       )}
 
-      {/* Onboarding Profile Modal */}
       <OnboardingModal
         isOpen={onboardingOpen}
         onClose={() => setOnboardingOpen(false)}
@@ -162,7 +166,6 @@ export default function App() {
         }}
       />
 
-      {/* Ask Bee AI Tutor Drawer */}
       <AITutorDrawer
         isOpen={aiTutorOpen}
         onClose={() => setAiTutorOpen(false)}

@@ -1,29 +1,11 @@
 import React, { useState } from 'react';
 import {
-  LayoutDashboard,
-  BookOpen,
-  Sparkles,
-  Trophy,
-  Mic,
-  BarChart3,
-  Flame,
-  Heart,
-  Zap,
-  Volume2,
-  VolumeX,
-  Search,
-  Menu,
-  X,
-  User,
-  Bot,
-  Database,
-  ShieldCheck,
-  Settings
+  LayoutDashboard, BookOpen, Sparkles, Trophy, Mic, BarChart3,
+  Flame, Heart, Zap, Volume2, VolumeX, Search, Menu, X, User, Bot
 } from 'lucide-react';
 import BeeAnimatedMascot from './BeeAnimatedMascot';
 import AuthModal from './AuthModal';
 import UserProfileModal from './UserProfileModal';
-import SupabaseModal from './SupabaseModal';
 import OfflineBanner from './OfflineBanner';
 import MobileBottomNav from './MobileBottomNav';
 import { soundService } from '../services/soundService';
@@ -41,7 +23,6 @@ export default function AppShell({
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [soundOn, setSoundOn] = useState(userStats?.soundEnabled ?? true);
-  const [supabaseModalOpen, setSupabaseModalOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
 
@@ -62,46 +43,32 @@ export default function AppShell({
     { id: 'leaderboard', label: 'Weekly Leagues', icon: Trophy, badge: userStats?.leagueTier || 'Gold' },
     { id: 'feynman', label: 'Feynman Method', icon: Mic },
     { id: 'analytics', label: 'Exam Analytics', icon: BarChart3 },
-    { id: 'admin', label: 'Admin Panel ⚙️', icon: Settings },
   ];
 
   return (
     <div className="h-screen w-screen bg-slate-950 text-slate-100 flex flex-col font-sans overflow-hidden select-none">
-      {/* Offline Connectivity Banner */}
       <OfflineBanner />
 
       {/* Top Header Navbar */}
       <header className="h-16 shrink-0 bg-slate-900/90 backdrop-blur-xl border-b border-slate-800/80 px-4 lg:px-6 flex items-center justify-between z-40">
-        {/* Brand Section */}
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="lg:hidden btn-icon"
-            aria-label="Toggle menu"
-          >
+          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="lg:hidden btn-icon">
             {sidebarOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
-
-          <div
-            onClick={() => setActiveTab('dashboard')}
-            className="flex items-center gap-2.5 cursor-pointer group"
-          >
+          <div onClick={() => setActiveTab('dashboard')} className="flex items-center gap-2.5 cursor-pointer">
             <BeeAnimatedMascot size="sm" animated={true} />
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="font-extrabold text-lg font-display tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-sky-400 via-indigo-300 to-amber-300">
-                  BEE AI
-                </span>
-                <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-sky-500/20 text-sky-400 border border-sky-500/30">
-                  GIZMO ENGINE
-                </span>
-              </div>
+            <div className="flex items-center gap-1.5">
+              <span className="font-extrabold text-lg font-display tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-sky-400 via-indigo-300 to-amber-300">
+                BEE AI
+              </span>
+              <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-sky-500/20 text-sky-400 border border-sky-500/30">
+                GIZMO ENGINE
+              </span>
             </div>
           </div>
         </div>
 
-        {/* Global Search Bar */}
-        <div className="hidden md:flex items-center gap-2 flex-1 max-w-sm mx-4">
+        <div className="hidden md:flex flex-1 max-w-sm mx-4">
           <div className="relative w-full">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={15} />
             <input
@@ -112,71 +79,42 @@ export default function AppShell({
           </div>
         </div>
 
-        {/* Gamification & Real-Time Controls */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          {/* Quick Reviewer Button */}
-          <button
-            onClick={onOpenQuickReview}
-            className="btn-secondary text-xs py-1.5 px-3 text-amber-400 border-amber-500/30 hover:border-amber-500"
-            title="Fast offline in-memory review session"
-          >
+          <button onClick={onOpenQuickReview} className="btn-secondary text-xs py-1.5 px-3 text-amber-400 border-amber-500/30 hover:border-amber-500">
             <Zap size={14} className="fill-amber-400" />
             <span className="hidden sm:inline">Quick Review</span>
           </button>
 
-          {/* AI Scan Button */}
           <button onClick={onOpenScan} className="btn-primary text-xs py-1.5 px-3">
             <Sparkles size={14} />
             <span className="hidden sm:inline">AI Scan</span>
           </button>
 
-          {/* Real-Time Total XP Badge */}
-          <div
-            className="flex items-center gap-1 bg-amber-500/15 border border-amber-500/30 text-amber-300 px-2.5 py-1 rounded-xl text-xs font-extrabold shadow-sm"
-            title="Your Real-Time Total Study XP"
-          >
+          {/* Real-Time XP Badge */}
+          <div className="flex items-center gap-1 bg-amber-500/15 border border-amber-500/30 text-amber-300 px-2.5 py-1 rounded-xl text-xs font-extrabold">
             <Zap size={15} className="fill-amber-400 text-amber-400" />
             <span>{userXp} XP</span>
           </div>
 
-          {/* Unlimited Hearts Badge */}
-          <div
-            className="flex items-center gap-1 bg-rose-500/15 border border-rose-500/30 text-rose-400 px-2.5 py-1 rounded-xl text-xs font-bold"
-            title="Unlimited Practice Hearts Active!"
-          >
+          {/* Unlimited Hearts */}
+          <div className="flex items-center gap-1 bg-rose-500/15 border border-rose-500/30 text-rose-400 px-2.5 py-1 rounded-xl text-xs font-bold">
             <Heart size={15} className="fill-rose-500 text-rose-500 animate-pulse" />
             <span className="text-xs font-extrabold">∞</span>
           </div>
 
-          {/* Streak Flame */}
-          <div
-            className="flex items-center gap-1 bg-amber-500/15 border border-amber-500/30 text-amber-400 px-2.5 py-1 rounded-xl text-xs font-bold"
-            title="Daily Study Streak"
-          >
+          {/* Streak */}
+          <div className="flex items-center gap-1 bg-amber-500/15 border border-amber-500/30 text-amber-400 px-2.5 py-1 rounded-xl text-xs font-bold">
             <Flame size={15} className="fill-amber-500 text-amber-500" />
             <span>{userStats?.currentStreak || 5}d</span>
           </div>
 
-          {/* Supabase Connection Button */}
-          <button
-            onClick={() => setSupabaseModalOpen(true)}
-            className="btn-icon w-8 h-8 text-emerald-400 border-emerald-500/30 hover:border-emerald-500"
-            title="Supabase Cloud Setup"
-          >
-            <Database size={16} />
-          </button>
-
-          {/* User Profile Avatar / Profile Management Trigger */}
+          {/* User Profile Button */}
           <button
             onClick={() => {
-              if (currentUser?.isAuthenticated) {
-                setProfileModalOpen(true);
-              } else {
-                setAuthModalOpen(true);
-              }
+              if (currentUser?.isAuthenticated) setProfileModalOpen(true);
+              else setAuthModalOpen(true);
             }}
             className="btn-secondary text-xs py-1 px-2.5 flex items-center gap-2 border-sky-500/30 hover:border-sky-400"
-            title="Open Profile Management"
           >
             {currentUser?.avatarUrl ? (
               <img src={currentUser.avatarUrl} alt="Avatar" className="w-6 h-6 rounded-full object-contain bg-slate-900 border border-sky-400 p-0.5" />
@@ -191,8 +129,7 @@ export default function AppShell({
           {/* Sound Button */}
           <button
             onClick={handleToggleSound}
-            className={`btn-icon text-xs w-8 h-8 ${soundOn ? 'text-sky-400 border-sky-500/40' : 'text-slate-500'}`}
-            title={soundOn ? 'Sound Enabled' : 'Sound Muted'}
+            className={`btn-icon w-8 h-8 ${soundOn ? 'text-sky-400 border-sky-500/40' : 'text-slate-500'}`}
           >
             {soundOn ? <Volume2 size={16} /> : <VolumeX size={16} />}
           </button>
@@ -214,10 +151,7 @@ export default function AppShell({
               return (
                 <button
                   key={item.id}
-                  onClick={() => {
-                    setActiveTab(item.id);
-                    setSidebarOpen(false);
-                  }}
+                  onClick={() => { setActiveTab(item.id); setSidebarOpen(false); }}
                   className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-medium text-xs transition-all ${
                     isActive
                       ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30 font-semibold'
@@ -245,31 +179,17 @@ export default function AppShell({
             <div className="text-[10px] font-bold text-amber-400 bg-amber-500/10 py-0.5 px-2 rounded-full inline-block border border-amber-500/20">
               ⚡ {userXp} Total XP
             </div>
-            <button
-              onClick={() => setActiveTab('askbee')}
-              className="w-full btn-primary text-xs py-1.5 justify-center"
-            >
+            <button onClick={() => setActiveTab('askbee')} className="w-full btn-primary text-xs py-1.5 justify-center">
               Ask Bee Anything!
             </button>
           </div>
         </aside>
 
-        {/* Content Container */}
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6">
-          {children}
-        </main>
+        <main className="flex-1 overflow-y-auto p-4 lg:p-6">{children}</main>
       </div>
 
-      {/* Mobile UX Bottom Navigation Bar */}
       <MobileBottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
 
-      {/* Supabase Connection Modal */}
-      <SupabaseModal
-        isOpen={supabaseModalOpen}
-        onClose={() => setSupabaseModalOpen(false)}
-      />
-
-      {/* User Profile Management Modal */}
       <UserProfileModal
         isOpen={profileModalOpen}
         onClose={() => setProfileModalOpen(false)}
@@ -281,13 +201,10 @@ export default function AppShell({
         }}
       />
 
-      {/* Auth Modal */}
       <AuthModal
         isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}
-        onAuthSuccess={(user) => {
-          onUserAuthChange(user);
-        }}
+        onAuthSuccess={(user) => { onUserAuthChange(user); }}
       />
     </div>
   );
