@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { User, Mail, Upload, Camera, Save, X, Sparkles, MapPin, GraduationCap, Target, ShieldCheck, Check } from 'lucide-react';
 import BeeAnimatedMascot from './BeeAnimatedMascot';
 import CityAutocomplete from './CityAutocomplete';
+import { logActivity } from '../services/activityLogService';
 
 const beeAvatarPresets = [
   '/bee_frame_1.png',
@@ -53,6 +54,13 @@ export default function UserProfileModal({ isOpen, onClose, currentUser, userSta
     };
 
     onSaveProfile(updatedUser, updatedStats);
+
+    // Log profile update to activity_logs
+    logActivity('Profile Updated', 'Profile', {
+      userId: currentUser?.userId,
+      username: username,
+    });
+
     setIsSaved(true);
     setTimeout(() => {
       setIsSaved(false);

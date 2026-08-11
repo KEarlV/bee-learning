@@ -1,4 +1,5 @@
 import { getSupabaseClient } from './supabaseService';
+import { logActivity } from './activityLogService';
 
 // SHA-256 hash using native Web Crypto API (no external deps)
 async function hashPassword(password) {
@@ -41,6 +42,14 @@ export async function registerUser({ username, password }) {
     .single();
 
   if (error) throw new Error(error.message);
+
+  // Log registration event
+  logActivity('User Registered', 'Auth', {
+    userId: data.user_id,
+    username,
+    status: 'PENDING',
+  });
+
   return data;
 }
 
@@ -76,6 +85,13 @@ export async function loginUser({ username, password }) {
     totalXp: user.total_xp || 0,
   };
   localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+
+  // Log login event
+  logActivity('User Login', 'Auth', {
+    userId: user.user_id,
+    username: user.username,
+  });
+
   return session;
 }
 

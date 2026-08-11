@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import BeeAnimatedMascot from './BeeAnimatedMascot';
 import { getAdminSupabaseClient } from '../services/supabaseService';
+import { logActivity } from '../services/activityLogService';
 
 export default function AdminPanel({ onLogout }) {
   const [activeSection, setActiveSection] = useState('overview');
@@ -77,7 +78,14 @@ export default function AdminPanel({ onLogout }) {
       .from('activity_logs')
       .select('*')
       .order('created_at', { ascending: false })
-      .limit(100);
+      .limit(200);
+    if (error) {
+      console.error('fetchLogs error:', error.message);
+      // Table might not exist yet
+      if (error.code === '42P01') {
+        console.warn('activity_logs table does not exist in Supabase. Run the SQL to create it.');
+      }
+    }
     if (!error && data) setLogs(data);
     setLogsLoading(false);
   }, [supabase]);
@@ -117,12 +125,13 @@ export default function AdminPanel({ onLogout }) {
   }, [supabase, fetchStats, fetchPending, fetchAllUsers]);
 
   // ── Approve / Reject handlers ────────────────────────────────
-  const handleApprove = async (userId) => {
+  const handleApprove = async (userId, username) => {
     if (!supabase) return;
     await supabase
       .from('user_stats')
       .update({ account_status: 'approved', approved_at: new Date().toISOString() })
       .eq('user_id', userId);
+    logActivity('User Approved', 'Admin', { userId, username: username || 'Unknown', status: 'SUCCESS' });
     setPendingUsers((prev) =>
       prev.map((u) => (u.user_id === userId ? { ...u, account_status: 'approved' } : u))
     );
