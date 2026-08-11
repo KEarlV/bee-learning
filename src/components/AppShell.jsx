@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   LayoutDashboard, BookOpen, Sparkles, Trophy, Mic, BarChart3,
-  Flame, Heart, Search, Menu, X, User, Bot, LogOut
+  Flame, Heart, Search, Menu, X, User, Bot, LogOut, Volume2, VolumeX
 } from 'lucide-react';
 import BeeAnimatedMascot from './BeeAnimatedMascot';
 import AuthModal from './AuthModal';
