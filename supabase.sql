@@ -148,3 +148,28 @@ CREATE POLICY "Anyone can read leaderboard" ON public.leaderboard_entries
 INSERT INTO public.user_stats (username, email, role, account_status)
 VALUES ('Admin', 'admin@beestudy.ai', 'admin', 'approved')
 ON CONFLICT (email) DO NOTHING;
+
+-- 11. Activity Logs Table (for Admin Audit Oversight)
+CREATE TABLE IF NOT EXISTS public.activity_logs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES public.user_stats(user_id) ON DELETE SET NULL,
+    username VARCHAR(100),
+    action TEXT NOT NULL,
+    category VARCHAR(100) DEFAULT 'General',
+    tokens_used INT DEFAULT 0,
+    status VARCHAR(30) DEFAULT 'SUCCESS',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+ALTER TABLE public.activity_logs ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Anyone can insert activity logs" ON public.activity_logs
+    FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "Anyone can read activity logs" ON public.activity_logs
+    FOR SELECT USING (true);
+
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.activity_logs;
+EXCEPTION WHEN SQLSTATE '42710' THEN NULL; END $$;
+

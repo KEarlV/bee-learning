@@ -93,21 +93,30 @@ export async function syncUserStatsToSupabase(userStats) {
   if (!supabase) return null;
 
   try {
+    const payload = {
+      username: userStats.username || 'BeeLearner',
+      city_location: userStats.cityLocation || 'Manila, 🇵🇭 Philippines',
+      education_level: userStats.educationLevel || 'College / University',
+      target_exam: userStats.targetExam || 'Biology & CS Midterms',
+      preferred_study_style: userStats.preferredStudyStyle || 'Active Recall + Feynman',
+      total_xp: userStats.totalXp || 350,
+      weekly_xp: userStats.weeklyXp || 350,
+      current_streak: userStats.currentStreak || 5,
+      daily_goal_target: userStats.dailyGoalTarget || 20,
+      cards_studied_today: userStats.cardsStudiedToday || 8,
+      cards_mastered: userStats.cardsMastered || 14
+    };
+
+    if (userStats.userId && userStats.userId !== 'local_user') {
+      payload.user_id = userStats.userId;
+    }
+    if (userStats.email) {
+      payload.email = userStats.email;
+    }
+
     const { data, error } = await supabase
       .from('user_stats')
-      .upsert({
-        username: userStats.username || 'BeeLearner',
-        city_location: userStats.cityLocation || 'Manila, 🇵🇭 Philippines',
-        education_level: userStats.educationLevel || 'College / University',
-        target_exam: userStats.targetExam || 'Biology & CS Midterms',
-        preferred_study_style: userStats.preferredStudyStyle || 'Active Recall + Feynman',
-        total_xp: userStats.totalXp || 350,
-        weekly_xp: userStats.weeklyXp || 350,
-        current_streak: userStats.currentStreak || 5,
-        daily_goal_target: userStats.dailyGoalTarget || 20,
-        cards_studied_today: userStats.cardsStudiedToday || 8,
-        cards_mastered: userStats.cardsMastered || 14
-      })
+      .upsert(payload, { onConflict: payload.user_id ? 'user_id' : payload.email ? 'email' : undefined })
       .select();
 
     if (error) throw error;
@@ -117,3 +126,4 @@ export async function syncUserStatsToSupabase(userStats) {
     return null;
   }
 }
+

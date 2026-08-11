@@ -42,7 +42,7 @@ export default function AdminPanel({ onLogout }) {
     setPendingLoading(true);
     const { data, error } = await supabase
       .from('user_stats')
-      .select('user_id, username, email, city_location, education_level, account_status, created_at')
+      .select('user_id, username, email, city_location, education_level, account_status, registered_at, created_at')
       .order('created_at', { ascending: false });
     if (error) console.error('fetchPending error:', error);
     if (!error && data) setPendingUsers(data);
@@ -215,21 +215,21 @@ export default function AdminPanel({ onLogout }) {
             {/* System Statuses */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {[
-                { label: 'Google Gemini API', sub: 'Pre-Configured Key Active', status: 'HEALTHY', color: 'emerald', icon: Server },
-                { label: 'Supabase PostgreSQL', sub: 'Realtime WebSocket Sync', status: 'CONNECTED', color: 'emerald', icon: Database },
-                { label: 'IndexedDB Storage', sub: 'Offline Fallback Engine', status: 'ACTIVE', color: 'sky', icon: Activity },
+                { label: 'Google Gemini API', sub: 'Pre-Configured Key Active', status: 'HEALTHY', borderCls: 'border-emerald-500/30', textCls: 'text-emerald-400', bgCls: 'bg-emerald-500/15', icon: Server },
+                { label: 'Supabase PostgreSQL', sub: 'Realtime WebSocket Sync', status: 'CONNECTED', borderCls: 'border-emerald-500/30', textCls: 'text-emerald-400', bgCls: 'bg-emerald-500/15', icon: Database },
+                { label: 'IndexedDB Storage', sub: 'Offline Fallback Engine', status: 'ACTIVE', borderCls: 'border-sky-500/30', textCls: 'text-sky-400', bgCls: 'bg-sky-500/15', icon: Activity },
               ].map((s, i) => {
                 const Icon = s.icon;
                 return (
-                  <div key={i} className={`glass-panel p-3.5 flex items-center justify-between border-${s.color}-500/30`}>
+                  <div key={i} className={`glass-panel p-3.5 flex items-center justify-between ${s.borderCls}`}>
                     <div className="flex items-center gap-2.5">
-                      <Icon size={18} className={`text-${s.color}-400`} />
+                      <Icon size={18} className={s.textCls} />
                       <div>
                         <h4 className="text-xs font-bold text-white">{s.label}</h4>
                         <p className="text-[10px] text-slate-400">{s.sub}</p>
                       </div>
                     </div>
-                    <span className={`text-[9px] font-bold text-${s.color}-400 bg-${s.color}-500/15 px-2 py-0.5 rounded-full`}>{s.status}</span>
+                    <span className={`text-[9px] font-bold ${s.textCls} ${s.bgCls} px-2 py-0.5 rounded-full`}>{s.status}</span>
                   </div>
                 );
               })}

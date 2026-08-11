@@ -96,7 +96,7 @@ export default function Dashboard({ userStats, onStartSession, onOpenScan, onNav
             </div>
             <div>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Cards Today</p>
-              <h4 className="text-sm font-extrabold text-white">{userStats?.cardsStudiedToday || 8} / {userStats?.dailyGoalTarget || 20}</h4>
+              <h4 className="text-sm font-extrabold text-white">{userStats?.cardsStudiedToday ?? 0} / {userStats?.dailyGoalTarget || 20}</h4>
             </div>
           </div>
           <span className="text-[9px] font-bold text-sky-400 bg-sky-500/10 px-2 py-0.5 rounded-full">GOAL</span>
@@ -109,11 +109,11 @@ export default function Dashboard({ userStats, onStartSession, onOpenScan, onNav
               <Trophy size={20} />
             </div>
             <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Local Rank (Manila)</p>
-              <h4 className="text-sm font-extrabold text-white">#3 Gold Tier</h4>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Local Rank ({userStats?.cityLocation?.split(',')[0] || 'Manila'})</p>
+              <h4 className="text-sm font-extrabold text-white">#3 {userStats?.leagueTier || 'Gold'} Tier</h4>
             </div>
           </div>
-          <span className="text-[9px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full">GOLD</span>
+          <span className="text-[9px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full">{(userStats?.leagueTier || 'Gold').toUpperCase()}</span>
         </div>
       </div>
 
@@ -161,7 +161,7 @@ export default function Dashboard({ userStats, onStartSession, onOpenScan, onNav
               </div>
 
               <div className="flex items-center justify-between border-t border-slate-800/80 pt-2.5 text-xs text-slate-400">
-                <span className="text-[11px] font-medium">{deck.cardCount || 5} cards due</span>
+                <span className="text-[11px] font-medium">{deck.cardCount ?? 0} cards due</span>
                 <span className="btn-primary text-[10px] py-1 px-2.5">
                   <Play size={10} fill="currentColor" />
                   Study Now

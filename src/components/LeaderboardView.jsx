@@ -1,32 +1,60 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Trophy, Crown, Flame, Zap, ShieldAlert, Globe, MapPin, Building } from 'lucide-react';
 import BeeAnimatedMascot from './BeeAnimatedMascot';
+import { fetchSupabaseLeaderboard } from '../services/supabaseService';
 
-export default function LeaderboardView() {
+export default function LeaderboardView({ userStats }) {
   const [scope, setScope] = useState('local'); // 'local' | 'national' | 'international'
+  const [supabaseEntries, setSupabaseEntries] = useState(null);
+
+  const userXp = userStats?.totalXp || 350;
+  const userStreak = userStats?.currentStreak || 5;
+  const userName = userStats?.username || 'You (Bee Learner)';
+  const userLocation = userStats?.cityLocation || 'Manila, PH';
+  const userAvatar = userStats?.avatarUrl || '/bee_frame_4.png';
+
+  useEffect(() => {
+    async function loadRealtimeLeaderboard() {
+      const data = await fetchSupabaseLeaderboard(scope, userStats?.cityLocation, userStats?.country);
+      if (data && data.length > 0) {
+        setSupabaseEntries(data);
+      }
+    }
+    loadRealtimeLeaderboard();
+  }, [scope, userStats]);
 
   const localEntries = [
-    { rank: 1, name: 'Alex_Mastery', location: 'Manila, PH', xp: 980, streak: 14, avatar: '/bee_frame_1.png', isUser: false },
-    { rank: 2, name: 'Sophia_Brain', location: 'Quezon City, PH', xp: 840, streak: 9, avatar: '/bee_frame_2.png', isUser: false },
-    { rank: 3, name: 'You (Bee Learner)', location: 'Manila, PH', xp: 620, streak: 5, avatar: '/bee_frame_4.png', isUser: true },
-    { rank: 4, name: 'Juan_Polytech', location: 'Manila, PH', xp: 510, streak: 4, avatar: '/bee_frame_3.png', isUser: false },
+    { rank: 1, name: 'Alex_Mastery', location: 'Manila, PH', xp: Math.max(980, userXp + 360), streak: 14, avatar: '/bee_frame_1.png', isUser: false },
+    { rank: 2, name: 'Sophia_Brain', location: 'Quezon City, PH', xp: Math.max(840, userXp + 220), streak: 9, avatar: '/bee_frame_2.png', isUser: false },
+    { rank: 3, name: userName, location: userLocation, xp: userXp, streak: userStreak, avatar: userAvatar, isUser: true },
+    { rank: 4, name: 'Juan_Polytech', location: 'Manila, PH', xp: Math.max(100, userXp - 110), streak: 4, avatar: '/bee_frame_3.png', isUser: false },
   ];
 
   const nationalEntries = [
-    { rank: 1, name: 'Maria_UP_Diliman', location: 'Philippines 🇵🇭', xp: 2450, streak: 28, avatar: '/bee_frame_2.png', isUser: false },
-    { rank: 2, name: 'Carlos_UST', location: 'Philippines 🇵🇭', xp: 1980, streak: 21, avatar: '/bee_frame_1.png', isUser: false },
-    { rank: 3, name: 'Alex_Mastery', location: 'Philippines 🇵🇭', xp: 980, streak: 14, avatar: '/bee_frame_1.png', isUser: false },
-    { rank: 12, name: 'You (Bee Learner)', location: 'Philippines 🇵🇭', xp: 620, streak: 5, avatar: '/bee_frame_4.png', isUser: true },
+    { rank: 1, name: 'Maria_UP_Diliman', location: 'Philippines 🇵🇭', xp: Math.max(2450, userXp + 1830), streak: 28, avatar: '/bee_frame_2.png', isUser: false },
+    { rank: 2, name: 'Carlos_UST', location: 'Philippines 🇵🇭', xp: Math.max(1980, userXp + 1360), streak: 21, avatar: '/bee_frame_1.png', isUser: false },
+    { rank: 3, name: 'Alex_Mastery', location: 'Philippines 🇵🇭', xp: Math.max(980, userXp + 360), streak: 14, avatar: '/bee_frame_1.png', isUser: false },
+    { rank: 12, name: userName, location: userLocation, xp: userXp, streak: userStreak, avatar: userAvatar, isUser: true },
   ];
 
   const internationalEntries = [
-    { rank: 1, name: 'Kenji_TokyoTech', location: 'Japan 🇯🇵', xp: 4890, streak: 45, avatar: '/bee_frame_1.png', isUser: false },
-    { rank: 2, name: 'Elena_Stanford', location: 'United States 🇺🇸', xp: 4120, streak: 38, avatar: '/bee_frame_3.png', isUser: false },
-    { rank: 3, name: 'Maria_UP_Diliman', location: 'Philippines 🇵🇭', xp: 2450, streak: 28, avatar: '/bee_frame_2.png', isUser: false },
-    { rank: 48, name: 'You (Bee Learner)', location: 'Philippines 🇵🇭', xp: 620, streak: 5, avatar: '/bee_frame_4.png', isUser: true },
+    { rank: 1, name: 'Kenji_TokyoTech', location: 'Japan 🇯🇵', xp: Math.max(4890, userXp + 4270), streak: 45, avatar: '/bee_frame_1.png', isUser: false },
+    { rank: 2, name: 'Elena_Stanford', location: 'United States 🇺🇸', xp: Math.max(4120, userXp + 3500), streak: 38, avatar: '/bee_frame_3.png', isUser: false },
+    { rank: 3, name: 'Maria_UP_Diliman', location: 'Philippines 🇵🇭', xp: Math.max(2450, userXp + 1830), streak: 28, avatar: '/bee_frame_2.png', isUser: false },
+    { rank: 48, name: userName, location: userLocation, xp: userXp, streak: userStreak, avatar: userAvatar, isUser: true },
   ];
 
-  const activeEntries = scope === 'local' ? localEntries : scope === 'national' ? nationalEntries : internationalEntries;
+  const activeEntries = supabaseEntries
+    ? supabaseEntries.map((e, idx) => ({
+        rank: idx + 1,
+        name: e.username,
+        location: e.city_location || e.country || 'Global',
+        xp: e.weekly_xp || 0,
+        streak: e.current_streak || 0,
+        avatar: e.avatar_url || '/bee_frame_1.png',
+        isUser: e.user_id === userStats?.userId
+      }))
+    : scope === 'local' ? localEntries : scope === 'national' ? nationalEntries : internationalEntries;
 
   return (
     <div className="max-w-4xl mx-auto space-y-5 select-none">
@@ -48,7 +76,7 @@ export default function LeaderboardView() {
       {/* Scope Switcher Tabs */}
       <div className="flex bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800 text-xs">
         <button
-          onClick={() => setScope('local')}
+          onClick={() => { setScope('local'); setSupabaseEntries(null); }}
           className={`flex-1 py-2.5 font-bold rounded-xl flex items-center justify-center gap-2 transition-all ${
             scope === 'local' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'
           }`}
@@ -58,7 +86,7 @@ export default function LeaderboardView() {
         </button>
 
         <button
-          onClick={() => setScope('national')}
+          onClick={() => { setScope('national'); setSupabaseEntries(null); }}
           className={`flex-1 py-2.5 font-bold rounded-xl flex items-center justify-center gap-2 transition-all ${
             scope === 'national' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'
           }`}
@@ -68,7 +96,7 @@ export default function LeaderboardView() {
         </button>
 
         <button
-          onClick={() => setScope('international')}
+          onClick={() => { setScope('international'); setSupabaseEntries(null); }}
           className={`flex-1 py-2.5 font-bold rounded-xl flex items-center justify-center gap-2 transition-all ${
             scope === 'international' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'
           }`}
@@ -123,3 +151,4 @@ export default function LeaderboardView() {
     </div>
   );
 }
+

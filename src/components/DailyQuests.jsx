@@ -3,23 +3,27 @@ import { Gift, Zap, CheckCircle2, Flame, Award, ArrowRight } from 'lucide-react'
 import { soundService } from '../services/soundService';
 
 export default function DailyQuests({ userStats, onClaimXp }) {
-  const [claimedLogin, setClaimedLogin] = useState(false);
+  const todayKey = `daily_login_claimed_${new Date().toISOString().split('T')[0]}`;
+  const [claimedLogin, setClaimedLogin] = useState(() => localStorage.getItem(todayKey) === 'true');
 
   const handleClaimLogin = () => {
     if (claimedLogin) return;
     setClaimedLogin(true);
+    localStorage.setItem(todayKey, 'true');
     soundService.playRoundCompleteFanfare();
-    onClaimXp && onClaimXp(50);
+    if (onClaimXp) onClaimXp(50);
   };
+
+  const cardsToday = userStats?.cardsStudiedToday ?? 0;
 
   const quests = [
     {
       id: 'quest-login',
       title: 'Daily Login Reward',
       reward: 50,
-      progress: claimedLogin ? 1 : 1,
+      progress: 1,
       target: 1,
-      completed: true,
+      completed: claimedLogin,
       canClaim: !claimedLogin,
       onClaim: handleClaimLogin
     },
@@ -27,9 +31,10 @@ export default function DailyQuests({ userStats, onClaimXp }) {
       id: 'quest-cards',
       title: 'Review 10 Flashcards Today',
       reward: 75,
-      progress: 8,
+      progress: Math.min(10, cardsToday),
       target: 10,
-      completed: false
+      completed: cardsToday >= 10,
+      canClaim: false
     },
     {
       id: 'quest-askbee',
@@ -37,7 +42,8 @@ export default function DailyQuests({ userStats, onClaimXp }) {
       reward: 60,
       progress: 1,
       target: 2,
-      completed: false
+      completed: false,
+      canClaim: false
     },
     {
       id: 'quest-feynman',
@@ -45,9 +51,12 @@ export default function DailyQuests({ userStats, onClaimXp }) {
       reward: 100,
       progress: 0,
       target: 1,
-      completed: false
+      completed: false,
+      canClaim: false
     }
   ];
+
+  const totalAvailableXp = quests.reduce((acc, q) => (!q.completed ? acc + q.reward : acc), 0);
 
   return (
     <div className="glass-panel p-5 space-y-4 border-amber-500/30">
@@ -61,7 +70,7 @@ export default function DailyQuests({ userStats, onClaimXp }) {
         </div>
 
         <span className="text-xs font-bold text-amber-300 bg-amber-500/15 border border-amber-500/30 px-3 py-1 rounded-full flex items-center gap-1">
-          <Zap size={14} className="fill-amber-400" /> +285 XP Available
+          <Zap size={14} className="fill-amber-400" /> +{totalAvailableXp} XP Available
         </span>
       </div>
 
@@ -86,7 +95,7 @@ export default function DailyQuests({ userStats, onClaimXp }) {
               </div>
 
               <span className="text-[10px] text-slate-500 font-mono">
-                {q.progress} / {q.target} {q.completed || q.canClaim ? '✓ Completed' : ''}
+                {q.progress} / {q.target} {q.completed ? '✓ Completed' : ''}
               </span>
             </div>
 
@@ -97,7 +106,7 @@ export default function DailyQuests({ userStats, onClaimXp }) {
               >
                 Claim XP
               </button>
-            ) : q.completed && claimedLogin ? (
+            ) : q.completed ? (
               <span className="text-emerald-400 text-xs font-bold flex items-center gap-1 shrink-0">
                 <CheckCircle2 size={16} /> Claimed
               </span>
@@ -108,3 +117,4 @@ export default function DailyQuests({ userStats, onClaimXp }) {
     </div>
   );
 }
+

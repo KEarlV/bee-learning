@@ -150,7 +150,7 @@ export default function App() {
               }}
             />
           )}
-          {activeTab === 'leaderboard' && <LeaderboardView />}
+          {activeTab === 'leaderboard' && <LeaderboardView userStats={userStats} />}
           {activeTab === 'feynman' && <FeynmanStudio />}
           {activeTab === 'analytics' && <AnalyticsView userStats={userStats} />}
         </>
