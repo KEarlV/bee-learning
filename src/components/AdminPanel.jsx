@@ -42,7 +42,7 @@ export default function AdminPanel({ onLogout }) {
     setPendingLoading(true);
     const { data, error } = await supabase
       .from('user_stats')
-      .select('user_id, username, email, city_location, education_level, account_status, registered_at, created_at')
+      .select('user_id, username, email, city_location, education_level, account_status, created_at')
       .order('created_at', { ascending: false });
     if (error) console.error('fetchPending error:', error);
     if (!error && data) setPendingUsers(data);
@@ -292,7 +292,7 @@ export default function AdminPanel({ onLogout }) {
                           {user.email || 'No email'} · {user.city_location || '—'} · {user.education_level || '—'}
                         </div>
                         <div className="text-[10px] text-slate-600">
-                          Registered: {user.registered_at ? new Date(user.registered_at).toLocaleString() : '—'}
+                          Registered: {user.created_at ? new Date(user.created_at).toLocaleString() : '—'}
                         </div>
                       </div>
                     </div>
