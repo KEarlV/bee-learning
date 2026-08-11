@@ -16,7 +16,10 @@ export function setApiKey(key) {
 // ── Native Direct Google Gemini REST Helper ─────────────────────
 async function callGeminiApi(promptOrContents) {
   const apiKey = getApiKey();
-  if (!apiKey) return null;
+  // Valid Google Gemini API keys start with 'AIzaSy'
+  if (!apiKey || typeof apiKey !== 'string' || !apiKey.startsWith('AIzaSy')) {
+    return null;
+  }
 
   let parts = [];
   if (typeof promptOrContents === 'string') {

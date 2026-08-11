@@ -67,12 +67,7 @@ export default function AdminPanel({ onLogout }) {
       created_at: new Date().toISOString()
     };
 
-    if (supabase) {
-      try {
-        await supabase.from('live_events').upsert(eventObj);
-      } catch (err) {}
-    }
-
+    // Broadcast via localStorage event
     try {
       localStorage.setItem('bee_live_event', JSON.stringify({
         ...eventObj,
