@@ -9,6 +9,7 @@ import UserProfileModal from './UserProfileModal';
 import StreakCalendarModal from './StreakCalendarModal';
 import OfflineBanner from './OfflineBanner';
 import LiveEventBanner from './LiveEventBanner';
+import MobileBottomNav from './MobileBottomNav';
 import { getTierInfo } from '../utils/tierSystem';
 
 export default function AppShell({
