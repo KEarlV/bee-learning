@@ -53,7 +53,7 @@ ${inputText}`;
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-1.5-flash',
+      model: 'gemini-flash-latest',
       contents: prompt,
     });
 
@@ -94,7 +94,7 @@ Return ONLY a raw JSON object with this schema:
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-1.5-flash',
+      model: 'gemini-flash-latest',
       contents: prompt,
     });
     const cleanJson = response.text.replace(/```json/g, '').replace(/```/g, '').trim();
@@ -124,7 +124,7 @@ Student's Question: "${userQuestion}"`;
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-1.5-flash',
+      model: 'gemini-flash-latest',
       contents: prompt,
     });
     return response.text;
