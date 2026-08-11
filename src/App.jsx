@@ -14,6 +14,7 @@ import OnboardingModal from './components/OnboardingModal';
 import AdminLoginPage from './components/AdminLoginPage';
 import AdminPanel from './components/AdminPanel';
 import { getUserStats, updateUserStats, db } from './services/storageService';
+import { getStoredSession } from './services/authService';
 
 // Check if current URL is the admin route
 const isAdminRoute = window.location.pathname === '/admin' || window.location.hash === '#/admin';
@@ -27,7 +28,7 @@ export default function App() {
   const [aiTutorOpen, setAiTutorOpen] = useState(false);
   const [cardContextForBee, setCardContextForBee] = useState('');
   const [onboardingOpen, setOnboardingOpen] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null); // null = not logged in (guest)
+  const [currentUser, setCurrentUser] = useState(() => getStoredSession()); // restore session on reload
 
   // Admin session state (completely separate from user session)
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(
