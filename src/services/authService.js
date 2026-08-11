@@ -1,4 +1,4 @@
-import { getSupabaseClient } from './supabaseService';
+import { getAdminSupabaseClient } from './supabaseService';
 import { logActivity } from './activityLogService';
 
 // SHA-256 hash using native Web Crypto API (no external deps)
@@ -14,7 +14,7 @@ const SESSION_KEY = 'bee_user_session';
 
 // ── Register new user ─────────────────────────────────────────
 export async function registerUser({ username, password }) {
-  const supabase = getSupabaseClient();
+  const supabase = getAdminSupabaseClient();
   if (!supabase) throw new Error('No Supabase connection.');
 
   // Check username is not already taken (maybeSingle = no error if not found)
@@ -55,7 +55,7 @@ export async function registerUser({ username, password }) {
 
 // ── Login existing user ───────────────────────────────────────
 export async function loginUser({ username, password }) {
-  const supabase = getSupabaseClient();
+  const supabase = getAdminSupabaseClient();
   if (!supabase) throw new Error('No Supabase connection.');
 
   const { data: user, error } = await supabase

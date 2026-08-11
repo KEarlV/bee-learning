@@ -15,7 +15,7 @@ import AdminLoginPage from './components/AdminLoginPage';
 import AdminPanel from './components/AdminPanel';
 import { getUserStats, updateUserStats, db } from './services/storageService';
 import { getStoredSession } from './services/authService';
-import { getSupabaseClient } from './services/supabaseService';
+import { getSupabaseClient, getAdminSupabaseClient } from './services/supabaseService';
 
 const isAdminRoute = window.location.pathname === '/admin' || window.location.hash === '#/admin';
 
@@ -39,7 +39,7 @@ export default function App() {
     if (isAdminRoute) return;
 
     if (currentUser?.userId && currentUser.userId !== 'local_user') {
-      const supabase = getSupabaseClient();
+      const supabase = getAdminSupabaseClient();
       if (supabase) {
         const { data } = await supabase
           .from('user_stats')
@@ -127,7 +127,7 @@ export default function App() {
     await updateUserStats({ totalXp: newTotal, weeklyXp: newWeekly });
 
     if (currentUser?.userId && currentUser.userId !== 'local_user') {
-      const supabase = getSupabaseClient();
+      const supabase = getAdminSupabaseClient();
       if (supabase) {
         await supabase
           .from('user_stats')
@@ -143,7 +143,7 @@ export default function App() {
     await updateUserStats(updates);
 
     if (currentUser?.userId && currentUser.userId !== 'local_user') {
-      const supabase = getSupabaseClient();
+      const supabase = getAdminSupabaseClient();
       if (supabase) {
         await supabase
           .from('user_stats')
