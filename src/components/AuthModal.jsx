@@ -58,8 +58,8 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, onLogout, cu
     }
   };
 
-  const overlayClass = `fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md transition-all duration-250 ${visible ? 'opacity-100' : 'opacity-0'}`;
-  const panelClass = `glass-panel w-full max-w-md p-6 relative border-sky-500/40 shadow-2xl space-y-5 transition-all duration-250 ${visible ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 translate-y-4'}`;
+  const overlayClass = `fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-md overflow-y-auto transition-all duration-250 ${visible ? 'opacity-100' : 'opacity-0'}`;
+  const panelClass = `glass-panel w-full max-w-md p-4 sm:p-6 relative border-sky-500/40 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto my-auto transition-all duration-250 ${visible ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 translate-y-4'}`;
 
   // ── Logged-in view: show profile + sign out ───────────────────
   if (isLoggedIn) {
