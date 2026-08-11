@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import SplashLoader from './components/SplashLoader';
 import AppShell from './components/AppShell';
 import Dashboard from './components/Dashboard';
@@ -15,8 +15,8 @@ import AdminLoginPage from './components/AdminLoginPage';
 import AdminPanel from './components/AdminPanel';
 import { getUserStats, updateUserStats, db } from './services/storageService';
 import { getStoredSession } from './services/authService';
+import { getSupabaseClient } from './services/supabaseService';
 
-// Check if current URL is the admin route
 const isAdminRoute = window.location.pathname === '/admin' || window.location.hash === '#/admin';
 
 export default function App() {
@@ -28,27 +28,59 @@ export default function App() {
   const [aiTutorOpen, setAiTutorOpen] = useState(false);
   const [cardContextForBee, setCardContextForBee] = useState('');
   const [onboardingOpen, setOnboardingOpen] = useState(false);
-  const [currentUser, setCurrentUser] = useState(() => getStoredSession()); // restore session on reload
+  const [currentUser, setCurrentUser] = useState(() => getStoredSession());
 
-  // Admin session state (completely separate from user session)
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(
     () => sessionStorage.getItem('bee_admin_session') === 'true'
   );
 
-  useEffect(() => {
-    if (!isAdminRoute) {
-      getUserStats().then((stats) => setUserStats(stats));
-    }
-  }, []);
+  // ── Load User Stats (from Supabase if logged in, else local IndexedDB) ──
+  const loadStats = useCallback(async () => {
+    if (isAdminRoute) return;
 
-  // ---- ADMIN ROUTE ----
+    if (currentUser?.userId && currentUser.userId !== 'local_user') {
+      const supabase = getSupabaseClient();
+      if (supabase) {
+        const { data } = await supabase
+          .from('user_stats')
+          .select('*')
+          .eq('user_id', currentUser.userId)
+          .maybeSingle();
+
+        if (data) {
+          setUserStats({
+            userId: data.user_id,
+            username: data.username,
+            totalXp: data.total_xp ?? 0,
+            weeklyXp: data.weekly_xp ?? 0,
+            currentStreak: data.current_streak ?? 1,
+            longestStreak: data.longest_streak ?? 1,
+            level: data.level ?? 1,
+            cardsMastered: data.cards_mastered ?? 0,
+            cardsStudiedToday: data.cards_studied_today ?? 0,
+            dailyGoalTarget: data.daily_goal_target ?? 20,
+            cityLocation: data.city_location || '',
+            educationLevel: data.education_level || '',
+            avatarUrl: data.avatar_url || null,
+            leagueTier: data.league_tier || 'Bronze',
+          });
+          return;
+        }
+      }
+    }
+
+    const localStats = await getUserStats();
+    setUserStats(localStats);
+  }, [currentUser]);
+
+  useEffect(() => {
+    loadStats();
+  }, [loadStats]);
+
+  // ── Admin Route ──────────────────────────────────────────────────────────
   if (isAdminRoute) {
     if (!isAdminAuthenticated) {
-      return (
-        <AdminLoginPage
-          onAdminAuthenticated={(val) => setIsAdminAuthenticated(val)}
-        />
-      );
+      return <AdminLoginPage onAdminAuthenticated={setIsAdminAuthenticated} />;
     }
     return (
       <AdminPanel
@@ -60,7 +92,7 @@ export default function App() {
     );
   }
 
-  // ---- REGULAR USER APP ----
+  // ── Session & XP Handlers ────────────────────────────────────────────────
   const handleStartSession = async (deck) => {
     const cards = await db.cards.where('deckId').equals(deck.id).toArray();
     setActiveSessionDeck(deck);
@@ -79,20 +111,50 @@ export default function App() {
   };
 
   const handleClaimXp = async (amount) => {
-    const updated = await updateUserStats({
-      totalXp: (userStats?.totalXp || 350) + amount,
-      weeklyXp: (userStats?.weeklyXp || 350) + amount
-    });
+    const currentXp = userStats?.totalXp ?? 0;
+    const currentWeekly = userStats?.weeklyXp ?? 0;
+    const newTotal = currentXp + amount;
+    const newWeekly = currentWeekly + amount;
+
+    const updated = { ...userStats, totalXp: newTotal, weeklyXp: newWeekly };
     setUserStats(updated);
+    await updateUserStats({ totalXp: newTotal, weeklyXp: newWeekly });
+
+    if (currentUser?.userId && currentUser.userId !== 'local_user') {
+      const supabase = getSupabaseClient();
+      if (supabase) {
+        await supabase
+          .from('user_stats')
+          .update({ total_xp: newTotal, weekly_xp: newWeekly })
+          .eq('user_id', currentUser.userId);
+      }
+    }
   };
 
   const handleUpdateUserStats = async (updates) => {
-    const updated = await updateUserStats(updates);
+    const updated = { ...userStats, ...updates };
     setUserStats(updated);
+    await updateUserStats(updates);
+
+    if (currentUser?.userId && currentUser.userId !== 'local_user') {
+      const supabase = getSupabaseClient();
+      if (supabase) {
+        await supabase
+          .from('user_stats')
+          .update({
+            city_location: updates.cityLocation,
+            education_level: updates.educationLevel,
+            target_exam: updates.targetExam,
+            preferred_study_style: updates.preferredStudyStyle,
+          })
+          .eq('user_id', currentUser.userId);
+      }
+    }
   };
 
   const handleLogout = () => {
-    setCurrentUser(null); // Clear user → shows Sign In button
+    setCurrentUser(null);
+    setUserStats(null);
   };
 
   if (showSplash) {
@@ -152,7 +214,7 @@ export default function App() {
             />
           )}
           {activeTab === 'leaderboard' && <LeaderboardView userStats={userStats} />}
-          {activeTab === 'feynman' && <FeynmanStudio />}
+          {activeTab === 'feynman' && <FeynmanStudio onClaimXp={handleClaimXp} />}
           {activeTab === 'analytics' && <AnalyticsView />}
         </>
       )}

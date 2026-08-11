@@ -40,7 +40,7 @@ export default function Dashboard({ userStats, onStartSession, onOpenScan, onNav
               Daily Login Bonus Ready!
             </span>
             <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20 flex items-center gap-1">
-              <Flame size={12} className="fill-amber-400" /> {userStats?.currentStreak || 5} Day Streak
+              <Flame size={12} className="fill-amber-400" /> {userStats?.currentStreak ?? 1} Day Streak
             </span>
           </div>
 

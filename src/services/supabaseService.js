@@ -99,12 +99,12 @@ export async function syncUserStatsToSupabase(userStats) {
       education_level: userStats.educationLevel || 'College / University',
       target_exam: userStats.targetExam || 'Biology & CS Midterms',
       preferred_study_style: userStats.preferredStudyStyle || 'Active Recall + Feynman',
-      total_xp: userStats.totalXp || 350,
-      weekly_xp: userStats.weeklyXp || 350,
-      current_streak: userStats.currentStreak || 5,
-      daily_goal_target: userStats.dailyGoalTarget || 20,
-      cards_studied_today: userStats.cardsStudiedToday || 8,
-      cards_mastered: userStats.cardsMastered || 14
+      total_xp: userStats.totalXp ?? 0,
+      weekly_xp: userStats.weeklyXp ?? 0,
+      current_streak: userStats.currentStreak ?? 1,
+      daily_goal_target: userStats.dailyGoalTarget ?? 20,
+      cards_studied_today: userStats.cardsStudiedToday ?? 0,
+      cards_mastered: userStats.cardsMastered ?? 0
     };
 
     if (userStats.userId && userStats.userId !== 'local_user') {

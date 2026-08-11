@@ -1,31 +1,49 @@
 import React, { useState } from 'react';
-import { Mic, Send, Sparkles, CheckCircle2, AlertCircle, Loader2, Award } from 'lucide-react';
+import { Mic, Send, Sparkles, CheckCircle2, AlertCircle, Loader2, Award, Zap } from 'lucide-react';
 import BeeAnimatedMascot from './BeeAnimatedMascot';
 import { evaluateFeynmanExplanation } from '../services/geminiService';
+import { logActivity } from '../services/activityLogService';
 
-export default function FeynmanStudio() {
+export default function FeynmanStudio({ onClaimXp }) {
   const [concept, setConcept] = useState('Selective Permeability of Cell Membrane');
   const [targetAnswer, setTargetAnswer] = useState('Phospholipid bilayer allows small hydrophobic molecules to pass freely while requiring transport proteins for ions.');
   const [userExplanation, setUserExplanation] = useState('');
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [evaluationResult, setEvaluationResult] = useState(null);
+  const [earnedXp, setEarnedXp] = useState(0);
 
   const handleEvaluate = async () => {
     if (!userExplanation.trim()) return;
     setIsEvaluating(true);
+    setEvaluationResult(null);
+    setEarnedXp(0);
 
     try {
       const result = await evaluateFeynmanExplanation(concept, targetAnswer, userExplanation);
       setEvaluationResult(result);
+
+      // Calculate XP based on mastery score
+      const score = result?.score ?? 0;
+      const xp = score >= 80 ? 100 : score >= 50 ? 50 : 25;
+      setEarnedXp(xp);
+
+      // Claim XP
+      if (onClaimXp) {
+        onClaimXp(xp, `Feynman Explanation: ${concept} (${score}%)`);
+      }
+
+      // Log activity
+      logActivity(`Feynman Explanation (${score}%)`, 'Feynman', { tokens: xp });
+
     } catch (e) {
-      console.error(e);
+      console.error('Feynman evaluation error:', e);
     } finally {
       setIsEvaluating(false);
     }
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-4xl mx-auto space-y-6 select-none">
       {/* Header */}
       <div className="glass-panel p-6 border-sky-500/30 flex items-center justify-between">
         <div>
@@ -34,14 +52,14 @@ export default function FeynmanStudio() {
             <h2 className="text-2xl font-bold text-white font-display">Feynman Method Studio</h2>
           </div>
           <p className="text-sm text-slate-400 mt-1">
-            The best way to test true mastery is teaching a concept. Explain it to Bee!
+            The best way to test true mastery is teaching a concept. Explain it to Bee and earn XP!
           </p>
         </div>
         <BeeAnimatedMascot size="lg" animated={true} speechBubble="Explain it to Bee!" />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Concept Card */}
+        {/* Concept Input Card */}
         <div className="glass-panel p-6 space-y-4">
           <div>
             <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">Concept to Explain</span>
@@ -84,7 +102,7 @@ export default function FeynmanStudio() {
           </button>
         </div>
 
-        {/* Bee Evaluation Feedback Card */}
+        {/* Bee Feedback Card */}
         <div className="glass-panel p-6 flex flex-col justify-between">
           {evaluationResult ? (
             <div className="space-y-4">
@@ -95,6 +113,19 @@ export default function FeynmanStudio() {
                 </div>
                 <span className="text-2xl font-extrabold text-sky-400">{evaluationResult.score}%</span>
               </div>
+
+              {/* XP Award Banner */}
+              {earnedXp > 0 && (
+                <div className="p-3 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-amber-300 font-bold text-xs">
+                    <Zap size={16} className="fill-amber-400 text-amber-400" />
+                    <span>+{earnedXp} XP Earned!</span>
+                  </div>
+                  <span className="text-[10px] font-bold text-amber-400/80 bg-amber-500/20 px-2 py-0.5 rounded-full">
+                    MASTERY BONUS
+                  </span>
+                </div>
+              )}
 
               <div>
                 <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-1">Strengths Identified</h4>
@@ -131,7 +162,7 @@ export default function FeynmanStudio() {
               <BeeAnimatedMascot size="lg" animated={true} />
               <h4 className="text-base font-bold text-slate-300">Ready for Bee's Feedback?</h4>
               <p className="text-xs text-slate-400 max-w-xs mx-auto">
-                Type your explanation on the left and click submit. Bee will evaluate your grasp!
+                Type your explanation on the left and click submit. Bee will evaluate your grasp and grant XP!
               </p>
             </div>
           )}
