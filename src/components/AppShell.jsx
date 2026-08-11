@@ -21,6 +21,7 @@ export default function AppShell({
   onUserAuthChange,
   onLogout,
   onUpdateUserStats,
+  onClaimXp,
   children
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -55,7 +56,7 @@ export default function AppShell({
   return (
     <div className="h-screen w-screen bg-slate-950 text-slate-100 flex flex-col font-sans overflow-hidden select-none">
       <OfflineBanner />
-      <LiveEventBanner currentSession={session} onClaimXp={onClaimXp} />
+      <LiveEventBanner currentSession={currentUser} onClaimXp={onClaimXp} />
 
       {/* ── Top Header ─────────────────────────────────────────── */}
       <header className="h-14 sm:h-16 shrink-0 bg-slate-900/95 backdrop-blur-xl border-b border-slate-800/80 px-3 sm:px-5 flex items-center justify-between z-40">
@@ -97,23 +98,26 @@ export default function AppShell({
 
         {/* Right: Action buttons */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          {/* Quick Review — Clean text-only button */}
+          {/* Quick Review */}
           <button
             onClick={onOpenQuickReview}
-            className="btn-secondary text-xs py-1.5 px-2.5 sm:px-3 text-amber-400 border-amber-500/30 hover:border-amber-500 font-bold"
+            className="btn-secondary text-[11px] sm:text-xs py-1.5 px-2 sm:px-3 text-amber-400 border-amber-500/30 hover:border-amber-500 font-bold flex items-center gap-1 shrink-0"
             title="Quick Review"
           >
-            <span>Quick Review</span>
+            <Flame size={13} className="shrink-0 text-amber-400" />
+            <span className="hidden sm:inline">Quick Review</span>
+            <span className="sm:hidden">Quick</span>
           </button>
 
           {/* AI Scan */}
           <button
             onClick={onOpenScan}
-            className="btn-primary text-xs py-1.5 px-2 sm:px-3 font-bold"
+            className="btn-primary text-[11px] sm:text-xs py-1.5 px-2 sm:px-3 font-bold flex items-center gap-1 shrink-0"
             title="AI Scan"
           >
-            <Sparkles size={14} className="shrink-0" />
+            <Sparkles size={13} className="shrink-0" />
             <span className="hidden sm:inline">AI Scan</span>
+            <span className="sm:hidden">Scan</span>
           </button>
 
           {/* XP — always shown but compact */}

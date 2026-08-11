@@ -200,6 +200,7 @@ export default function App() {
       onUserAuthChange={(user) => setCurrentUser(user)}
       onLogout={handleLogout}
       onUpdateUserStats={handleUpdateUserStats}
+      onClaimXp={handleClaimXp}
     >
       {activeSessionDeck ? (
         <StudyArena
