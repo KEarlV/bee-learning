@@ -26,13 +26,32 @@ function getAiClient() {
   }
 }
 
-// ── 1. Generate Flashcards from Text or Uploaded Document/Image ──
-export async function generateFlashcardsFromText(inputText, cardCount = 5, filePayload = null) {
+// ── Robust Multi-Model API Call Helper ──────────────────────────
+async function callGeminiApi(contents) {
   const ai = getAiClient();
-  if (!ai) {
-    return createDemoCards(inputText || 'Study Notes', cardCount);
+  if (!ai) return null;
+
+  const modelsToTry = ['gemini-2.0-flash', 'gemini-2.5-flash-lite', 'gemini-1.5-flash'];
+
+  for (const modelName of modelsToTry) {
+    try {
+      const response = await ai.models.generateContent({
+        model: modelName,
+        contents: contents,
+      });
+      if (response && response.text) {
+        return response.text;
+      }
+    } catch (err) {
+      console.warn(`Gemini model ${modelName} notice:`, err?.message || err);
+    }
   }
 
+  return null;
+}
+
+// ── 1. Generate Flashcards from Text or Uploaded Document/Image ──
+export async function generateFlashcardsFromText(inputText, cardCount = 5, filePayload = null) {
   const promptText = `You are Bee, an expert AI study tutor. Analyze the provided study material (text, document, or image) and generate a MIXED SET of ${cardCount} high-quality cards for active recall study.
 
 IMPORTANT: Include a mix of card types: "flashcard", "multiple_choice", and "identification".
@@ -66,12 +85,9 @@ Return ONLY a raw JSON array of objects without markdown backticks. Each object 
   contents.push(promptText + (inputText ? `\n\nStudy Content:\n${inputText}` : ''));
 
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-1.5-flash',
-      contents: contents,
-    });
+    const rawText = await callGeminiApi(contents);
+    if (!rawText) return createDemoCards(inputText || 'Study Material', cardCount);
 
-    const rawText = response.text || '';
     const cleanJson = rawText
       .replace(/```json/gi, '')
       .replace(/```/g, '')
@@ -83,23 +99,13 @@ Return ONLY a raw JSON array of objects without markdown backticks. Each object 
     }
     return createDemoCards(inputText || 'Study Material', cardCount);
   } catch (err) {
-    console.error('Gemini 1.5 Flash generation error:', err);
+    console.error('Gemini generation error:', err);
     return createDemoCards(inputText || 'Study Material', cardCount);
   }
 }
 
 // ── 2. Evaluate Feynman Method Explanation ─────────────────────
 export async function evaluateFeynmanExplanation(conceptPrompt, answerText, userExplanation) {
-  const ai = getAiClient();
-  if (!ai) {
-    return {
-      score: 85,
-      strengths: ['Good core grasp of the main mechanism.'],
-      missingPoints: ['Could mention specific ATP yield numbers.'],
-      feedback: 'Great job! Bee thinks your explanation is clear and easy to understand.'
-    };
-  }
-
   const prompt = `You are Bee, the friendly AI study mascot. Evaluate the user's spoken or typed explanation of this study concept according to the Feynman Technique.
 
 Target Concept: "${conceptPrompt}"
@@ -115,11 +121,17 @@ Return ONLY a raw JSON object with this schema:
 }`;
 
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-1.5-flash',
-      contents: prompt,
-    });
-    const cleanJson = (response.text || '')
+    const rawText = await callGeminiApi(prompt);
+    if (!rawText) {
+      return {
+        score: 85,
+        strengths: ['Good core grasp of the main mechanism.'],
+        missingPoints: ['Could mention specific ATP yield numbers.'],
+        feedback: 'Great job! Bee thinks your explanation is clear and easy to understand.'
+      };
+    }
+
+    const cleanJson = rawText
       .replace(/```json/gi, '')
       .replace(/```/g, '')
       .trim();
@@ -137,26 +149,19 @@ Return ONLY a raw JSON object with this schema:
 
 // ── 3. Ask Bee AI Tutor ───────────────────────────────────────
 export async function askBeeTutor(userQuestion, cardContext = '') {
-  const ai = getAiClient();
-  if (!ai) {
-    return `BZZZ! 🐝 Bee is here to help! Regarding "${cardContext || 'this topic'}": Remember to break down complex ideas into 3 simple steps. Try connecting it to a real-world example!`;
-  }
-
   const prompt = `You are Bee, a super cute, cheerful, smart AI study mascot wearing a graduation cap and glasses (inspired by Jollibee's warmth). Answer the student's question clearly, enthusiastically, and concisely. Use bullet points or analogies if helpful.
 
 Card Context: "${cardContext}"
 Student's Question: "${userQuestion}"`;
 
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-1.5-flash',
-      contents: prompt,
-    });
-    return response.text;
+    const text = await callGeminiApi(prompt);
+    if (text) return text;
   } catch (err) {
     console.error('Bee Tutor error:', err);
-    return 'Bzzz! Bee had a small connection hiccup, but keep going—you are doing amazing!';
   }
+
+  return `BZZZ! 🐝 Bee is here to help! Regarding "${cardContext || 'this topic'}": Remember to break down complex ideas into 3 simple steps. Try connecting it to a real-world example!`;
 }
 
 // ── Mixed Card Set Creator (Fallback) ───────────────────────────
