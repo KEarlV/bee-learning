@@ -1,5 +1,3 @@
-import { GoogleGenAI } from '@google/genai';
-
 let customApiKey = localStorage.getItem('gemini_api_key') || '';
 
 export function getApiKey() {
@@ -15,35 +13,49 @@ export function setApiKey(key) {
   }
 }
 
-function getAiClient() {
+// ── Native Direct Google Gemini REST Helper ─────────────────────
+async function callGeminiApi(promptOrContents) {
   const apiKey = getApiKey();
   if (!apiKey) return null;
-  try {
-    return new GoogleGenAI({ apiKey });
-  } catch (e) {
-    console.error('Failed to init GoogleGenAI:', e);
-    return null;
-  }
-}
 
-// ── Robust Multi-Model API Call Helper ──────────────────────────
-async function callGeminiApi(contents) {
-  const ai = getAiClient();
-  if (!ai) return null;
-
-  const modelsToTry = ['gemini-2.0-flash', 'gemini-2.5-flash-lite', 'gemini-1.5-flash'];
-
-  for (const modelName of modelsToTry) {
-    try {
-      const response = await ai.models.generateContent({
-        model: modelName,
-        contents: contents,
-      });
-      if (response && response.text) {
-        return response.text;
+  let parts = [];
+  if (typeof promptOrContents === 'string') {
+    parts.push({ text: promptOrContents });
+  } else if (Array.isArray(promptOrContents)) {
+    promptOrContents.forEach((c) => {
+      if (typeof c === 'string') {
+        parts.push({ text: c });
+      } else if (c?.inlineData) {
+        parts.push({
+          inline_data: {
+            mime_type: c.inlineData.mimeType,
+            data: c.inlineData.data,
+          },
+        });
       }
-    } catch (err) {
-      console.warn(`Gemini model ${modelName} notice:`, err?.message || err);
+    });
+  }
+
+  const models = ['gemini-1.5-flash-latest', 'gemini-1.5-flash', 'gemini-2.0-flash-exp'];
+
+  for (const model of models) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts }],
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) return text;
+      }
+    } catch (e) {
+      // Fail silently and try next endpoint
     }
   }
 
@@ -99,7 +111,6 @@ Return ONLY a raw JSON array of objects without markdown backticks. Each object 
     }
     return createDemoCards(inputText || 'Study Material', cardCount);
   } catch (err) {
-    console.error('Gemini generation error:', err);
     return createDemoCards(inputText || 'Study Material', cardCount);
   }
 }
@@ -137,7 +148,6 @@ Return ONLY a raw JSON object with this schema:
       .trim();
     return JSON.parse(cleanJson);
   } catch (err) {
-    console.error('Feynman eval error:', err);
     return {
       score: 80,
       strengths: ['Captured the basic concept.'],
@@ -149,7 +159,7 @@ Return ONLY a raw JSON object with this schema:
 
 // ── 3. Ask Bee AI Tutor ───────────────────────────────────────
 export async function askBeeTutor(userQuestion, cardContext = '') {
-  const prompt = `You are Bee, a super cute, cheerful, smart AI study mascot wearing a graduation cap and glasses (inspired by Jollibee's warmth). Answer the student's question clearly, enthusiastically, and concisely. Use bullet points or analogies if helpful.
+  const prompt = `You are Bee, a super cute, cheerful, smart AI study mascot wearing a graduation cap and glasses (inspired by Jollibee's warmth). Answer the student's question clearly, enthusiastically, and concisely like ChatGPT or Gemini.
 
 Card Context: "${cardContext}"
 Student's Question: "${userQuestion}"`;
@@ -158,7 +168,7 @@ Student's Question: "${userQuestion}"`;
     const text = await callGeminiApi(prompt);
     if (text) return text;
   } catch (err) {
-    console.warn('Bee Tutor connection notice:', err);
+    // Fail silently to fallback
   }
 
   return getSmartFallbackAnswer(userQuestion, cardContext);
@@ -186,15 +196,15 @@ function getSmartFallbackAnswer(question, context) {
     return `BZZZ! 🐝 A JavaScript Closure in 3 simple steps:
 
 1. **Definition**: A function bundled together with references to its surrounding lexical environment.
-2. **How it works**: Inner functions remember and access variables from outer functions even after the outer function finishes executing.
+2. **How it works**: Inner functions remember and access variables from outer functions even after outer function finishes.
 3. **Use Case**: Data privacy, stateful counter functions, and factory handlers!`;
   }
 
   return `BZZZ! 🐝 Bee is here to help! Regarding "${question}":
 
-• **Step 1 — Core Concept**: Break the main idea down into basic component parts.
-• **Step 2 — Practical Analogy**: Imagine how this operates in everyday life.
-• **Step 3 — Exam Tip**: Focus on key terminology and relationships between mechanisms! Keep up the great work!`;
+1. **Core Concept**: Break the main idea down into basic component parts.
+2. **Practical Analogy**: Imagine how this operates in everyday life.
+3. **Exam Tip**: Focus on key terminology and relationships between mechanisms! Keep up the great work!`;
 }
 
 // ── Mixed Card Set Creator (Fallback) ───────────────────────────

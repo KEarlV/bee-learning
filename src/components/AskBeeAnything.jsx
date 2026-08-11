@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Bot, Send, Sparkles, Lightbulb, HelpCircle, ArrowRight, MessageSquareText, ShieldCheck } from 'lucide-react';
 import BeeAnimatedMascot from './BeeAnimatedMascot';
 import SkeletonLoader from './SkeletonLoader';
-import { askBeeTutor } from '../services/geminiService';
+import { FormattedMessageText } from '../utils/formatText';
 
 export default function AskBeeAnything() {
   const [messages, setMessages] = useState([
@@ -94,7 +94,7 @@ export default function AskBeeAnything() {
                     : 'bg-slate-900/90 text-slate-200 border border-slate-800 rounded-bl-none shadow-sm'
                 }`}
               >
-                {m.text}
+                <FormattedMessageText text={m.text} />
               </div>
             </div>
           ))}

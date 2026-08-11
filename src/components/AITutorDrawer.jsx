@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Bot, Send, X, Sparkles, Lightbulb, MessageSquare } from 'lucide-react';
 import BeeAnimatedMascot from './BeeAnimatedMascot';
 import { askBeeTutor } from '../services/geminiService';
+import { FormattedMessageText } from '../utils/formatText';
 
 export default function AITutorDrawer({ isOpen, onClose, cardContext = '' }) {
   const [messages, setMessages] = useState([
@@ -83,7 +84,7 @@ export default function AITutorDrawer({ isOpen, onClose, cardContext = '' }) {
                   : 'bg-slate-800/90 text-slate-200 border border-slate-700 rounded-bl-none'
               }`}
             >
-              {msg.text}
+              <FormattedMessageText text={msg.text} />
             </div>
           </div>
         ))}
