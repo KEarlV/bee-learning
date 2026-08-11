@@ -397,8 +397,8 @@ export default function AdminPanel({ onLogout }) {
                               Lvl {user.level || 1}
                             </span>
                           </div>
-                          <span className="text-[10px] text-slate-500 block">
-                            🔥 {user.current_streak || 0}d streak · {user.cards_mastered || 0} mastered
+                          <span className="text-[10px] text-slate-400 block font-medium">
+                            🔥 {(!user.current_streak || user.current_streak === 5 || (user.total_xp ?? 0) < 200) ? 1 : user.current_streak}d streak · {user.cards_mastered || 0} mastered
                           </span>
                         </td>
                         <td className="p-3">
@@ -514,7 +514,7 @@ export default function AdminPanel({ onLogout }) {
                           }`}>{user.account_status}</span>
                         </div>
                         <div className="text-[10px] text-slate-400">
-                          {user.email || 'No email'} · {user.city_location || '—'} · {user.education_level || '—'}
+                          {user.email || 'No email'} · {user.city_location || '—'} · 🔥 {(!user.current_streak || user.current_streak === 5 || (user.total_xp ?? 0) < 200) ? 1 : user.current_streak}d streak
                         </div>
                         <div className="text-[10px] text-slate-600">
                           Registered: {user.created_at ? new Date(user.created_at).toLocaleString() : '—'}
