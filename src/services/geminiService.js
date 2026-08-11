@@ -26,15 +26,14 @@ function getAiClient() {
   }
 }
 
-// 1. Generate Structured Flashcards & Quizzes from Text/Notes
-export async function generateFlashcardsFromText(inputText, cardCount = 5) {
+// ── 1. Generate Flashcards from Text or Uploaded Document/Image ──
+export async function generateFlashcardsFromText(inputText, cardCount = 5, filePayload = null) {
   const ai = getAiClient();
   if (!ai) {
-    // Demo fallback generator when API key is missing
-    return createDemoCards(inputText, cardCount);
+    return createDemoCards(inputText || 'Study Notes', cardCount);
   }
 
-  const prompt = `You are Bee, an expert AI study tutor. Analyze the following study notes/content and generate ${cardCount} high-quality flashcards & quizzes for active recall study.
+  const promptText = `You are Bee, an expert AI study tutor. Analyze the provided study material (text, document, or image) and generate ${cardCount} high-quality flashcards & quizzes for active recall study.
 
 Return ONLY a raw JSON array of objects without markdown backticks. Each object must fit this schema:
 [
@@ -46,27 +45,45 @@ Return ONLY a raw JSON array of objects without markdown backticks. Each object 
     "hintText": "Helpful subtle hint",
     "dynamicMnemonic": "Fun memorable acronym or analogy"
   }
-]
+]`;
 
-Content:
-${inputText}`;
+  const contents = [];
+
+  // Add image/pdf binary data if present
+  if (filePayload?.base64Data && filePayload?.mimeType) {
+    const cleanBase64 = filePayload.base64Data.includes(',')
+      ? filePayload.base64Data.split(',')[1]
+      : filePayload.base64Data;
+    contents.push({
+      inlineData: {
+        data: cleanBase64,
+        mimeType: filePayload.mimeType,
+      },
+    });
+  }
+
+  contents.push(promptText + (inputText ? `\n\nStudy Content:\n${inputText}` : ''));
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-flash-latest',
-      contents: prompt,
+      model: 'gemini-2.5-flash',
+      contents: contents,
     });
 
     const rawText = response.text || '';
-    const cleanJson = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+    const cleanJson = rawText
+      .replace(/```json/gi, '')
+      .replace(/```/g, '')
+      .trim();
+
     return JSON.parse(cleanJson);
   } catch (err) {
-    console.error('Gemini generation error:', err);
-    return createDemoCards(inputText, cardCount);
+    console.error('Gemini 2.5 Flash generation error:', err);
+    return createDemoCards(inputText || 'Study Material', cardCount);
   }
 }
 
-// 2. Evaluate Feynman Method Explanation
+// ── 2. Evaluate Feynman Method Explanation ─────────────────────
 export async function evaluateFeynmanExplanation(conceptPrompt, answerText, userExplanation) {
   const ai = getAiClient();
   if (!ai) {
@@ -94,10 +111,13 @@ Return ONLY a raw JSON object with this schema:
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-flash-latest',
+      model: 'gemini-2.5-flash',
       contents: prompt,
     });
-    const cleanJson = response.text.replace(/```json/g, '').replace(/```/g, '').trim();
+    const cleanJson = (response.text || '')
+      .replace(/```json/gi, '')
+      .replace(/```/g, '')
+      .trim();
     return JSON.parse(cleanJson);
   } catch (err) {
     console.error('Feynman eval error:', err);
@@ -110,7 +130,7 @@ Return ONLY a raw JSON object with this schema:
   }
 }
 
-// 3. Ask Bee AI Tutor Drawer
+// ── 3. Ask Bee AI Tutor ───────────────────────────────────────
 export async function askBeeTutor(userQuestion, cardContext = '') {
   const ai = getAiClient();
   if (!ai) {
@@ -124,7 +144,7 @@ Student's Question: "${userQuestion}"`;
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-flash-latest',
+      model: 'gemini-2.5-flash',
       contents: prompt,
     });
     return response.text;
@@ -134,12 +154,12 @@ Student's Question: "${userQuestion}"`;
   }
 }
 
-// Demo fallback creator
+// ── Fallback generator ─────────────────────────────────────────
 function createDemoCards(text, count) {
   const sampleTopics = [
-    { front: 'What is the main concept discussed in these notes?', back: text.slice(0, 150) + '...', hint: 'Review the opening sentence.' },
-    { front: 'Why is this topic important for exams?', back: 'It establishes core foundational principles and key definitions.', hint: 'Think fundamental mechanics.' },
-    { front: 'How does this connect to real-world applications?', back: 'It provides practical frameworks used in problem-solving.', hint: 'Consider real-world scenarios.' }
+    { front: 'What is the main concept discussed in these study notes?', back: (text || 'Core concept definition').slice(0, 150) + '...', hint: 'Review the opening section.' },
+    { front: 'Why is this topic essential for exam mastery?', back: 'It establishes fundamental principles required for higher-level applications.', hint: 'Think core frameworks.' },
+    { front: 'How does this principle apply in practical scenarios?', back: 'It provides systematic guidelines for analyzing complex problems.', hint: 'Consider practical use cases.' }
   ];
   return sampleTopics.slice(0, count).map((t, idx) => ({
     id: 'gen-' + Date.now() + '-' + idx,
@@ -148,6 +168,6 @@ function createDemoCards(text, count) {
     backContent: t.back,
     options: idx % 2 !== 0 ? [t.back, 'Incorrect Option A', 'Incorrect Option B', 'Incorrect Option C'] : undefined,
     hintText: t.hint,
-    dynamicMnemonic: 'Bee Tip: Link this term with a colorful image in your mind!'
+    dynamicMnemonic: 'Bee Tip: Connect this concept with a vivid visual memory!'
   }));
 }
