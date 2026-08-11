@@ -221,7 +221,7 @@ export default function FileScanner({ onDeckCreated }) {
               <div key={idx} className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-sky-500/40 space-y-2">
                 <div className="flex items-center justify-between text-xs text-sky-400 font-bold uppercase">
                   <span>Card #{idx + 1} ({card.cardType || 'flashcard'})</span>
-                  <span className="text-amber-400 text-[10px]">✨ Gemini 2.5 Flash</span>
+                  <span className="text-amber-400 text-[10px]">✨ Gemini 1.5 Flash</span>
                 </div>
                 <p className="text-sm font-semibold text-slate-200">Q: {card.frontContent}</p>
                 <p className="text-xs text-slate-400 border-t border-slate-800 pt-2">A: {card.backContent}</p>

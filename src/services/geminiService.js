@@ -66,7 +66,7 @@ Return ONLY a raw JSON array of objects without markdown backticks. Each object 
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-1.5-flash',
       contents: contents,
     });
 
@@ -111,7 +111,7 @@ Return ONLY a raw JSON object with this schema:
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-1.5-flash',
       contents: prompt,
     });
     const cleanJson = (response.text || '')
@@ -144,7 +144,7 @@ Student's Question: "${userQuestion}"`;
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-1.5-flash',
       contents: prompt,
     });
     return response.text;
