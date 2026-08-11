@@ -17,14 +17,30 @@ export default function LiveEventBanner({ currentSession, onClaimXp }) {
   const supabase = getSupabaseClient();
 
   // ── Fetch active live event from Supabase / localStorage ──────
+  // ── Fetch active live event from localStorage / Supabase ──────
   const fetchLiveEvent = async () => {
+    // 1. Try local storage state first (instant & zero latency)
+    try {
+      const localStr = localStorage.getItem('bee_live_event');
+      if (localStr) {
+        const parsed = JSON.parse(localStr);
+        const now = Date.now();
+        if (parsed && parsed.expires_at > now) {
+          setActiveEvent(parsed);
+          setTimeLeft(Math.floor((parsed.expires_at - now) / 1000));
+          return;
+        }
+      }
+    } catch (e) {}
+
+    // 2. Fallback to Supabase live_events table if available
     try {
       if (supabase) {
         const { data, error } = await supabase
           .from('live_events')
           .select('*')
           .eq('id', 'current_event')
-          .single();
+          .maybeSingle();
 
         if (!error && data) {
           const now = Date.now();
@@ -38,22 +54,8 @@ export default function LiveEventBanner({ currentSession, onClaimXp }) {
         }
       }
     } catch (e) {
-      // Supabase table fallback
+      // Table doesn't exist yet - handled gracefully
     }
-
-    // Fallback to local storage state
-    try {
-      const localStr = localStorage.getItem('bee_live_event');
-      if (localStr) {
-        const parsed = JSON.parse(localStr);
-        const now = Date.now();
-        if (parsed.expires_at > now) {
-          setActiveEvent(parsed);
-          setTimeLeft(Math.floor((parsed.expires_at - now) / 1000));
-          return;
-        }
-      }
-    } catch (e) {}
 
     setActiveEvent(null);
     setTimeLeft(0);
