@@ -1,154 +1,240 @@
-import React, { useState, useEffect } from 'react';
-import { Trophy, Crown, Flame, Zap, ShieldAlert, Globe, MapPin, Building } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Trophy, Flame, Zap, Globe, MapPin, Building, Loader2, RefreshCw } from 'lucide-react';
 import BeeAnimatedMascot from './BeeAnimatedMascot';
-import { fetchSupabaseLeaderboard } from '../services/supabaseService';
+import { getSupabaseClient } from '../services/supabaseService';
+import { getStoredSession } from '../services/authService';
 
-export default function LeaderboardView({ userStats }) {
-  const [scope, setScope] = useState('local'); // 'local' | 'national' | 'international'
-  const [supabaseEntries, setSupabaseEntries] = useState(null);
+const SCOPES = [
+  { id: 'local',         label: 'City',     icon: Building },
+  { id: 'national',      label: 'National', icon: MapPin   },
+  { id: 'international', label: 'World',    icon: Globe    },
+];
 
-  const userXp = userStats?.totalXp || 350;
-  const userStreak = userStats?.currentStreak || 5;
-  const userName = userStats?.username || 'You (Bee Learner)';
-  const userLocation = userStats?.cityLocation || 'Manila, PH';
-  const userAvatar = userStats?.avatarUrl || '/bee_frame_4.png';
+const RANK_MEDAL = (r) =>
+  r === 1 ? '🥇' : r === 2 ? '🥈' : r === 3 ? '🥉' : `#${r}`;
 
-  useEffect(() => {
-    async function loadRealtimeLeaderboard() {
-      const data = await fetchSupabaseLeaderboard(scope, userStats?.cityLocation, userStats?.country);
-      if (data && data.length > 0) {
-        setSupabaseEntries(data);
-      }
+export default function LeaderboardView() {
+  const [scope, setScope]       = useState('local');
+  const [entries, setEntries]   = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [lastUpdated, setLastUpdated] = useState(null);
+
+  const session = getStoredSession();
+  const supabase = getSupabaseClient();
+
+  // ── Fetch leaderboard from user_stats ──────────────────────
+  const fetchLeaderboard = useCallback(async () => {
+    if (!supabase) { setLoading(false); return; }
+    setLoading(true);
+
+    let query = supabase
+      .from('user_stats')
+      .select('user_id, username, total_xp, weekly_xp, current_streak, city_location, country, account_status')
+      .eq('account_status', 'approved')
+      .order('total_xp', { ascending: false })
+      .limit(50);
+
+    // Scope filtering
+    if (scope === 'local' && session?.cityLocation) {
+      query = query.ilike('city_location', `%${session.cityLocation.split(',')[0]}%`);
+    } else if (scope === 'national') {
+      query = query.ilike('country', '%Philippines%');
     }
-    loadRealtimeLeaderboard();
-  }, [scope, userStats]);
+    // international = no filter → everyone
 
-  const localEntries = [
-    { rank: 1, name: 'Alex_Mastery', location: 'Manila, PH', xp: Math.max(980, userXp + 360), streak: 14, avatar: '/bee_frame_1.png', isUser: false },
-    { rank: 2, name: 'Sophia_Brain', location: 'Quezon City, PH', xp: Math.max(840, userXp + 220), streak: 9, avatar: '/bee_frame_2.png', isUser: false },
-    { rank: 3, name: userName, location: userLocation, xp: userXp, streak: userStreak, avatar: userAvatar, isUser: true },
-    { rank: 4, name: 'Juan_Polytech', location: 'Manila, PH', xp: Math.max(100, userXp - 110), streak: 4, avatar: '/bee_frame_3.png', isUser: false },
-  ];
+    const { data, error } = await query;
+    if (!error && data) {
+      setEntries(
+        data.map((u, idx) => ({
+          rank:      idx + 1,
+          userId:    u.user_id,
+          name:      u.username || 'Anonymous',
+          location:  u.city_location || u.country || '—',
+          xp:        u.total_xp || 0,
+          weeklyXp:  u.weekly_xp || 0,
+          streak:    u.current_streak || 0,
+          isYou:     u.user_id === session?.userId,
+        }))
+      );
+      setLastUpdated(new Date());
+    }
+    setLoading(false);
+  }, [supabase, scope, session?.userId, session?.cityLocation]);
 
-  const nationalEntries = [
-    { rank: 1, name: 'Maria_UP_Diliman', location: 'Philippines 🇵🇭', xp: Math.max(2450, userXp + 1830), streak: 28, avatar: '/bee_frame_2.png', isUser: false },
-    { rank: 2, name: 'Carlos_UST', location: 'Philippines 🇵🇭', xp: Math.max(1980, userXp + 1360), streak: 21, avatar: '/bee_frame_1.png', isUser: false },
-    { rank: 3, name: 'Alex_Mastery', location: 'Philippines 🇵🇭', xp: Math.max(980, userXp + 360), streak: 14, avatar: '/bee_frame_1.png', isUser: false },
-    { rank: 12, name: userName, location: userLocation, xp: userXp, streak: userStreak, avatar: userAvatar, isUser: true },
-  ];
+  // Initial load + scope change
+  useEffect(() => {
+    fetchLeaderboard();
+  }, [fetchLeaderboard]);
 
-  const internationalEntries = [
-    { rank: 1, name: 'Kenji_TokyoTech', location: 'Japan 🇯🇵', xp: Math.max(4890, userXp + 4270), streak: 45, avatar: '/bee_frame_1.png', isUser: false },
-    { rank: 2, name: 'Elena_Stanford', location: 'United States 🇺🇸', xp: Math.max(4120, userXp + 3500), streak: 38, avatar: '/bee_frame_3.png', isUser: false },
-    { rank: 3, name: 'Maria_UP_Diliman', location: 'Philippines 🇵🇭', xp: Math.max(2450, userXp + 1830), streak: 28, avatar: '/bee_frame_2.png', isUser: false },
-    { rank: 48, name: userName, location: userLocation, xp: userXp, streak: userStreak, avatar: userAvatar, isUser: true },
-  ];
+  // ── Real-time subscription ──────────────────────────────────
+  useEffect(() => {
+    if (!supabase) return;
 
-  const activeEntries = supabaseEntries
-    ? supabaseEntries.map((e, idx) => ({
-        rank: idx + 1,
-        name: e.username,
-        location: e.city_location || e.country || 'Global',
-        xp: e.weekly_xp || 0,
-        streak: e.current_streak || 0,
-        avatar: e.avatar_url || '/bee_frame_1.png',
-        isUser: e.user_id === userStats?.userId
-      }))
-    : scope === 'local' ? localEntries : scope === 'national' ? nationalEntries : internationalEntries;
+    const channel = supabase
+      .channel('leaderboard-live')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'user_stats' },
+        () => fetchLeaderboard()  // re-fetch on any change
+      )
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
+  }, [supabase, fetchLeaderboard]);
+
+  const youRow = entries.find((e) => e.isYou);
 
   return (
-    <div className="max-w-4xl mx-auto space-y-5 select-none">
+    <div className="max-w-2xl mx-auto space-y-4 select-none">
       {/* Header */}
-      <div className="glass-panel p-6 border-amber-500/30 flex items-center justify-between">
-        <div>
+      <div className="glass-panel p-4 sm:p-5 border-amber-500/30 flex items-center justify-between gap-3">
+        <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <Trophy className="text-amber-400" size={26} />
-            <h2 className="text-2xl font-bold text-white font-display">Real-Time Leaderboards</h2>
+            <Trophy className="text-amber-400 shrink-0" size={22} />
+            <h2 className="text-lg sm:text-xl font-bold text-white font-display truncate">
+              Real-Time Leaderboards
+            </h2>
+            {/* Live pulse */}
+            <span className="flex items-center gap-1 text-[9px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full shrink-0">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block" />
+              LIVE
+            </span>
           </div>
-          <p className="text-xs text-slate-400 mt-1">
-            Rank up in Local, National, and International leagues by earning study XP!
+          <p className="text-[11px] text-slate-400 mt-0.5">
+            Earn XP to rank up — updates instantly as users study
           </p>
         </div>
-
-        <BeeAnimatedMascot size="lg" animated={true} flightPath={true} speechBubble="Aim for #1!" />
+        <BeeAnimatedMascot size="md" animated={true} speechBubble="Aim for #1!" className="shrink-0" />
       </div>
 
-      {/* Scope Switcher Tabs */}
-      <div className="flex bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800 text-xs">
-        <button
-          onClick={() => { setScope('local'); setSupabaseEntries(null); }}
-          className={`flex-1 py-2.5 font-bold rounded-xl flex items-center justify-center gap-2 transition-all ${
-            scope === 'local' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          <Building size={16} />
-          Local Scope (City)
-        </button>
-
-        <button
-          onClick={() => { setScope('national'); setSupabaseEntries(null); }}
-          className={`flex-1 py-2.5 font-bold rounded-xl flex items-center justify-center gap-2 transition-all ${
-            scope === 'national' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          <MapPin size={16} />
-          National Scope (🇵🇭 PH)
-        </button>
-
-        <button
-          onClick={() => { setScope('international'); setSupabaseEntries(null); }}
-          className={`flex-1 py-2.5 font-bold rounded-xl flex items-center justify-center gap-2 transition-all ${
-            scope === 'international' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          <Globe size={16} />
-          International Scope (World)
-        </button>
-      </div>
-
-      {/* Leaderboard Rankings Table */}
-      <div className="glass-panel p-4 space-y-2 border-slate-800">
-        {activeEntries.map((item) => (
-          <div
-            key={item.rank + item.name}
-            className={`p-3.5 rounded-2xl border flex items-center justify-between transition-all ${
-              item.isUser
-                ? 'bg-sky-500/20 border-sky-400 shadow-md font-bold'
-                : 'bg-slate-900/80 border-slate-800 hover:bg-slate-800/80'
+      {/* Scope tabs */}
+      <div className="flex bg-slate-900/90 p-1 rounded-2xl border border-slate-800 text-xs gap-1">
+        {SCOPES.map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            onClick={() => { setScope(id); }}
+            className={`flex-1 py-2 font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all ${
+              scope === id
+                ? 'bg-amber-500 text-slate-950 shadow-lg'
+                : 'text-slate-400 hover:text-white'
             }`}
           >
-            <div className="flex items-center gap-3.5">
-              <span className={`w-7 text-center font-extrabold text-sm ${
-                item.rank === 1 ? 'text-amber-400 text-base' : item.rank === 2 ? 'text-slate-300' : item.rank === 3 ? 'text-amber-600' : 'text-slate-500'
-              }`}>
-                {item.rank === 1 ? '🥇' : item.rank === 2 ? '🥈' : item.rank === 3 ? '🥉' : `#${item.rank}`}
-              </span>
+            <Icon size={14} className="shrink-0" />
+            <span className="hidden sm:inline">{label}</span>
+            <span className="sm:hidden">{label.charAt(0)}</span>
+          </button>
+        ))}
+      </div>
 
-              <img src={item.avatar} alt="Avatar" className="w-9 h-9 rounded-full bg-slate-800 p-0.5 object-contain" />
+      {/* Last updated + refresh */}
+      {lastUpdated && (
+        <div className="flex items-center justify-between text-[10px] text-slate-500 px-1">
+          <span>Updated {lastUpdated.toLocaleTimeString()}</span>
+          <button
+            onClick={fetchLeaderboard}
+            className="flex items-center gap-1 hover:text-slate-300 transition-colors"
+          >
+            <RefreshCw size={11} /> Refresh
+          </button>
+        </div>
+      )}
 
-              <div>
-                <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
-                  {item.name}
-                  {item.isUser && (
-                    <span className="text-[9px] font-extrabold bg-sky-500 text-white px-1.5 py-0.5 rounded-full">YOU</span>
-                  )}
-                </h4>
-                <span className="text-[10px] text-slate-400 font-medium">{item.location}</span>
-              </div>
+      {/* Your rank banner (if logged in and ranked) */}
+      {youRow && (
+        <div className="flex items-center justify-between p-3 glass-panel border-sky-400/40 bg-sky-500/10 rounded-2xl text-xs">
+          <div className="flex items-center gap-2">
+            <span className="font-extrabold text-sky-300 text-sm">{RANK_MEDAL(youRow.rank)}</span>
+            <div className="w-7 h-7 rounded-full bg-sky-500/30 border border-sky-400/50 flex items-center justify-center text-[11px] font-bold text-sky-300">
+              {youRow.name.charAt(0).toUpperCase()}
             </div>
-
-            <div className="flex items-center gap-4 text-xs">
-              <span className="flex items-center gap-1 text-amber-400 font-extrabold">
-                <Zap size={14} className="fill-amber-400" /> {item.xp} XP
-              </span>
-              <span className="flex items-center gap-1 text-slate-400 text-[11px]">
-                <Flame size={13} className="text-amber-500" /> {item.streak}d
-              </span>
+            <div>
+              <span className="font-bold text-sky-200">{youRow.name}</span>
+              <span className="ml-1.5 text-[9px] font-extrabold bg-sky-500 text-white px-1.5 py-0.5 rounded-full">YOU</span>
             </div>
           </div>
-        ))}
+          <div className="flex items-center gap-3">
+            <span className="flex items-center gap-1 text-amber-400 font-extrabold">
+              <Zap size={13} className="fill-amber-400" /> {youRow.xp} XP
+            </span>
+            <span className="flex items-center gap-1 text-slate-400">
+              <Flame size={13} className="text-amber-500" /> {youRow.streak}d
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Rankings list */}
+      <div className="glass-panel p-3 sm:p-4 space-y-2 border-slate-800">
+        {loading ? (
+          <div className="flex items-center justify-center py-12 gap-2 text-slate-400 text-xs">
+            <Loader2 size={18} className="animate-spin" /> Loading live rankings...
+          </div>
+        ) : entries.length === 0 ? (
+          <div className="text-center py-12 space-y-3">
+            <p className="text-slate-400 text-sm font-medium">No players ranked yet.</p>
+            <p className="text-slate-600 text-xs">
+              {scope === 'local'
+                ? 'Be the first in your city to study and earn XP!'
+                : scope === 'national'
+                ? 'No Philippine players yet — start studying to claim #1!'
+                : 'No global players yet — lead the world leaderboard!'}
+            </p>
+            <BeeAnimatedMascot size="md" animated={true} speechBubble="Be first!" className="mx-auto" />
+          </div>
+        ) : (
+          entries.map((item) => (
+            <div
+              key={item.userId || item.name}
+              className={`p-3 sm:p-3.5 rounded-xl border flex items-center justify-between gap-2 transition-all ${
+                item.isYou
+                  ? 'bg-sky-500/15 border-sky-400/50 shadow-md'
+                  : 'bg-slate-900/60 border-slate-800 hover:bg-slate-800/60'
+              }`}
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                {/* Rank */}
+                <span className={`w-7 shrink-0 text-center font-extrabold text-sm ${
+                  item.rank === 1 ? 'text-base' : item.rank > 3 ? 'text-slate-500 text-xs' : ''
+                }`}>
+                  {RANK_MEDAL(item.rank)}
+                </span>
+
+                {/* Avatar initial */}
+                <div className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-[11px] font-bold border ${
+                  item.isYou
+                    ? 'bg-sky-500/30 border-sky-400/60 text-sky-200'
+                    : 'bg-slate-800 border-slate-700 text-slate-300'
+                }`}>
+                  {item.name.charAt(0).toUpperCase()}
+                </div>
+
+                {/* Name + location */}
+                <div className="min-w-0">
+                  <h4 className="text-xs font-bold text-white flex items-center gap-1.5 truncate">
+                    <span className="truncate">{item.name}</span>
+                    {item.isYou && (
+                      <span className="text-[9px] font-extrabold bg-sky-500 text-white px-1.5 py-0.5 rounded-full shrink-0">YOU</span>
+                    )}
+                  </h4>
+                  <span className="text-[10px] text-slate-500 truncate block">{item.location}</span>
+                </div>
+              </div>
+
+              {/* XP + Streak */}
+              <div className="flex items-center gap-2 sm:gap-4 shrink-0 text-xs">
+                <span className="flex items-center gap-1 text-amber-400 font-extrabold whitespace-nowrap">
+                  <Zap size={13} className="fill-amber-400 shrink-0" />
+                  {item.xp.toLocaleString()}
+                  <span className="hidden sm:inline"> XP</span>
+                </span>
+                <span className="hidden sm:flex items-center gap-1 text-slate-400">
+                  <Flame size={13} className="text-amber-500 shrink-0" /> {item.streak}d
+                </span>
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
 }
-
