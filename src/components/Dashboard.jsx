@@ -2,10 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { BookOpen, Sparkles, Trophy, Play, Plus, Flame, Heart, Clock, Trash2, Zap } from 'lucide-react';
 import BeeAnimatedMascot from './BeeAnimatedMascot';
 import DailyQuests from './DailyQuests';
+import StreakCalendarModal from './StreakCalendarModal';
 import { db } from '../services/storageService';
+
 
 export default function Dashboard({ userStats, onStartSession, onOpenScan, onNavigateTab, onClaimXp }) {
   const [decks, setDecks] = useState([]);
+  const [streakModalOpen, setStreakModalOpen] = useState(false);
+
 
   useEffect(() => {
     async function loadDecks() {
@@ -39,9 +43,13 @@ export default function Dashboard({ userStats, onStartSession, onOpenScan, onNav
             <span className="text-[10px] font-bold uppercase tracking-wider text-sky-400 bg-sky-500/10 px-2.5 py-0.5 rounded-full border border-sky-500/20">
               Daily Login Bonus Ready!
             </span>
-            <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20 flex items-center gap-1">
+            <button
+              onClick={() => setStreakModalOpen(true)}
+              className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20 hover:border-amber-400 flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+            >
               <Flame size={12} className="fill-amber-400" /> {userStats?.currentStreak ?? 1} Day Streak
-            </span>
+            </button>
+
           </div>
 
           <h1 className="text-xl sm:text-2xl font-bold text-white font-display">
@@ -172,6 +180,13 @@ export default function Dashboard({ userStats, onStartSession, onOpenScan, onNav
           ))}
         </div>
       </div>
+
+      <StreakCalendarModal
+        isOpen={streakModalOpen}
+        onClose={() => setStreakModalOpen(false)}
+        userStats={userStats}
+      />
     </div>
   );
 }
+

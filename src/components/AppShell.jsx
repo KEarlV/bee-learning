@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import {
   LayoutDashboard, BookOpen, Sparkles, Trophy, Mic, BarChart3,
-  Flame, Heart, Zap, Volume2, VolumeX, Search, Menu, X, User, Bot, LogOut
+  Flame, Heart, Search, Menu, X, User, Bot, LogOut
 } from 'lucide-react';
 import BeeAnimatedMascot from './BeeAnimatedMascot';
 import AuthModal from './AuthModal';
 import UserProfileModal from './UserProfileModal';
+import StreakCalendarModal from './StreakCalendarModal';
 import OfflineBanner from './OfflineBanner';
 import MobileBottomNav from './MobileBottomNav';
 import { soundService } from '../services/soundService';
@@ -26,6 +27,7 @@ export default function AppShell({
   const [soundOn, setSoundOn] = useState(userStats?.soundEnabled ?? true);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [streakModalOpen, setStreakModalOpen] = useState(false);
 
   const isLoggedIn = currentUser?.isAuthenticated && currentUser?.userId !== 'local_user';
 
@@ -37,16 +39,17 @@ export default function AppShell({
 
   const closeSidebar = () => setSidebarOpen(false);
   const userXp = userStats?.totalXp || 0;
+  const currentStreak = userStats?.currentStreak ?? 1;
 
   const navItems = [
-    { id: 'dashboard',   label: 'Dashboard',         icon: LayoutDashboard },
-    { id: 'library',     label: 'My Library',         icon: BookOpen },
-    { id: 'quick',       label: 'Quick Reviewer ⚡',  icon: Zap },
-    { id: 'askbee',      label: 'Ask Bee Anything 🤖', icon: Bot },
-    { id: 'studio',      label: 'AI Scanner Studio',  icon: Sparkles },
-    { id: 'leaderboard', label: 'Weekly Leagues',     icon: Trophy, badge: userStats?.leagueTier || 'Gold' },
-    { id: 'feynman',     label: 'Feynman Method',     icon: Mic },
-    { id: 'analytics',   label: 'Exam Analytics',     icon: BarChart3 },
+    { id: 'dashboard',   label: 'Dashboard',        icon: LayoutDashboard },
+    { id: 'library',     label: 'My Library',        icon: BookOpen },
+    { id: 'quick',       label: 'Quick Reviewer',    icon: BookOpen },
+    { id: 'askbee',      label: 'Ask Bee Anything',  icon: Bot },
+    { id: 'studio',      label: 'AI Scanner Studio', icon: Sparkles },
+    { id: 'leaderboard', label: 'Weekly Leagues',    icon: Trophy, badge: userStats?.leagueTier || 'Gold' },
+    { id: 'feynman',     label: 'Feynman Method',    icon: Mic },
+    { id: 'analytics',   label: 'Exam Analytics',    icon: BarChart3 },
   ];
 
   return (
@@ -93,20 +96,19 @@ export default function AppShell({
 
         {/* Right: Action buttons */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          {/* Quick Review — icon-only on mobile */}
+          {/* Quick Review — Clean text-only button */}
           <button
             onClick={onOpenQuickReview}
-            className="btn-secondary text-xs py-1.5 px-2 sm:px-3 text-amber-400 border-amber-500/30 hover:border-amber-500"
+            className="btn-secondary text-xs py-1.5 px-2.5 sm:px-3 text-amber-400 border-amber-500/30 hover:border-amber-500 font-bold"
             title="Quick Review"
           >
-            <Zap size={14} className="fill-amber-400 shrink-0" />
-            <span className="hidden sm:inline">Quick Review</span>
+            <span>Quick Review</span>
           </button>
 
-          {/* AI Scan — icon-only on mobile */}
+          {/* AI Scan */}
           <button
             onClick={onOpenScan}
-            className="btn-primary text-xs py-1.5 px-2 sm:px-3"
+            className="btn-primary text-xs py-1.5 px-2 sm:px-3 font-bold"
             title="AI Scan"
           >
             <Sparkles size={14} className="shrink-0" />
@@ -115,21 +117,24 @@ export default function AppShell({
 
           {/* XP — always shown but compact */}
           <div className="flex items-center gap-1 bg-amber-500/15 border border-amber-500/30 text-amber-300 px-2 py-1 rounded-xl text-xs font-extrabold">
-            <Zap size={13} className="fill-amber-400 text-amber-400 shrink-0" />
             <span>{userXp}<span className="hidden sm:inline"> XP</span></span>
           </div>
 
-          {/* Hearts — hide on very small screens */}
+          {/* Unlimited Hearts */}
           <div className="hidden xs:flex items-center gap-1 bg-rose-500/15 border border-rose-500/30 text-rose-400 px-2 py-1 rounded-xl text-xs font-bold">
             <Heart size={13} className="fill-rose-500 text-rose-500 animate-pulse shrink-0" />
             <span className="font-extrabold">∞</span>
           </div>
 
-          {/* Streak — hide on very small screens */}
-          <div className="hidden xs:flex items-center gap-1 bg-amber-500/15 border border-amber-500/30 text-amber-400 px-2 py-1 rounded-xl text-xs font-bold">
-            <Flame size={13} className="fill-amber-500 text-amber-500 shrink-0" />
-            <span>{userStats?.currentStreak || 0}d</span>
-          </div>
+          {/* Streak Badge — Clickable Gizmo Popup Calendar */}
+          <button
+            onClick={() => setStreakModalOpen(true)}
+            className="hidden xs:flex items-center gap-1 bg-amber-500/15 border border-amber-500/30 hover:border-amber-400 text-amber-400 px-2.5 py-1 rounded-xl text-xs font-bold cursor-pointer transition-all active:scale-95"
+            title="View Streak Calendar"
+          >
+            <Flame size={14} className="fill-amber-500 text-amber-500 shrink-0" />
+            <span>{currentStreak}d</span>
+          </button>
 
           {/* User auth button */}
           {isLoggedIn ? (
@@ -249,7 +254,7 @@ export default function AppShell({
           </div>
         </aside>
 
-        {/* Main content — bottom padding accounts for mobile nav bar */}
+        {/* Main content */}
         <main className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6 pb-20 lg:pb-6">
           {children}
         </main>
@@ -280,6 +285,12 @@ export default function AppShell({
         currentUser={currentUser}
         onAuthSuccess={(user) => { onUserAuthChange(user); setAuthModalOpen(false); }}
         onLogout={() => { onLogout?.(); setAuthModalOpen(false); }}
+      />
+
+      <StreakCalendarModal
+        isOpen={streakModalOpen}
+        onClose={() => setStreakModalOpen(false)}
+        userStats={userStats}
       />
     </div>
   );

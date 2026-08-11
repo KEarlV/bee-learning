@@ -48,13 +48,19 @@ export default function App() {
           .maybeSingle();
 
         if (data) {
+          let streakVal = data.current_streak ?? 1;
+          if ((data.total_xp ?? 0) === 0 && streakVal !== 1) {
+            streakVal = 1;
+            supabase.from('user_stats').update({ current_streak: 1, longest_streak: 1 }).eq('user_id', currentUser.userId);
+          }
+
           setUserStats({
             userId: data.user_id,
             username: data.username,
             totalXp: data.total_xp ?? 0,
             weeklyXp: data.weekly_xp ?? 0,
-            currentStreak: data.current_streak ?? 1,
-            longestStreak: data.longest_streak ?? 1,
+            currentStreak: streakVal,
+            longestStreak: Math.max(streakVal, data.longest_streak ?? 1),
             level: data.level ?? 1,
             cardsMastered: data.cards_mastered ?? 0,
             cardsStudiedToday: data.cards_studied_today ?? 0,

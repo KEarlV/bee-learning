@@ -45,16 +45,21 @@ export default function LeaderboardView() {
     const { data, error } = await query;
     if (!error && data) {
       setEntries(
-        data.map((u, idx) => ({
-          rank:      idx + 1,
-          userId:    u.user_id,
-          name:      u.username || 'Anonymous',
-          location:  u.city_location || u.country || '—',
-          xp:        u.total_xp || 0,
-          weeklyXp:  u.weekly_xp || 0,
-          streak:    u.current_streak || 0,
-          isYou:     u.user_id === session?.userId,
-        }))
+        data.map((u, idx) => {
+          const userXp = u.total_xp ?? 0;
+          let streak = u.current_streak ?? 1;
+          if (userXp === 0 || streak > 30) streak = 1;
+          return {
+            rank:      idx + 1,
+            userId:    u.user_id,
+            name:      u.username || 'Anonymous',
+            location:  u.city_location || u.country || '—',
+            xp:        userXp,
+            weeklyXp:  u.weekly_xp ?? 0,
+            streak:    streak,
+            isYou:     u.user_id === session?.userId,
+          };
+        })
       );
       setLastUpdated(new Date());
     }
