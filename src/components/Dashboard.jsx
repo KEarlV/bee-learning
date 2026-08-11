@@ -31,9 +31,9 @@ export default function Dashboard({ userStats, onStartSession, onOpenScan, onNav
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 select-none">
+    <div className="max-w-5xl mx-auto space-y-4 sm:space-y-6 select-none">
       {/* Welcome Hero Banner */}
-      <div className="glass-panel p-5 border-sky-500/30 flex flex-col sm:flex-row items-center justify-between gap-4 relative overflow-hidden">
+      <div className="glass-panel p-4 sm:p-5 border-sky-500/30 flex flex-col sm:flex-row items-center justify-between gap-3 relative overflow-hidden">
         <div className="space-y-2 text-center sm:text-left">
           <div className="flex items-center justify-center sm:justify-start gap-2">
             <span className="text-[10px] font-bold uppercase tracking-wider text-sky-400 bg-sky-500/10 px-2.5 py-0.5 rounded-full border border-sky-500/20">
@@ -44,7 +44,7 @@ export default function Dashboard({ userStats, onStartSession, onOpenScan, onNav
             </span>
           </div>
 
-          <h1 className="text-2xl font-bold text-white font-display">
+          <h1 className="text-xl sm:text-2xl font-bold text-white font-display">
             Ready to Review with Bee?
           </h1>
           <p className="text-xs text-slate-300 max-w-md">
@@ -72,8 +72,8 @@ export default function Dashboard({ userStats, onStartSession, onOpenScan, onNav
       {/* Daily Quests Widget */}
       <DailyQuests userStats={userStats} onClaimXp={onClaimXp} />
 
-      {/* Quick Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      {/* Quick Stats Grid — 2 cols on mobile, 3 on sm+ */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3">
         {/* Hearts */}
         <div className="glass-panel p-3.5 flex items-center justify-between border-rose-500/30">
           <div className="flex items-center gap-3">
@@ -131,7 +131,8 @@ export default function Dashboard({ userStats, onStartSession, onOpenScan, onNav
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+        {/* Decks grid — 1 col mobile, 2 col md, 3 col lg */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {decks.map((deck) => (
             <div
               key={deck.id}
