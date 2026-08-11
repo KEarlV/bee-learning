@@ -175,7 +175,7 @@ Student's Question: "${userQuestion}"`;
 }
 
 // ── Smart Fallback AI Answer Generator ─────────────────────────
-function getSmartFallbackAnswer(question, context) {
+export function getSmartFallbackAnswer(question, context) {
   const q = (question || '').toLowerCase();
   if (q.includes('dna') || q.includes('rna')) {
     return `BZZZ! 🐝 Here is the simple breakdown between DNA and RNA:

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Bot, Send, Sparkles, Lightbulb, HelpCircle, ArrowRight, MessageSquareText, ShieldCheck } from 'lucide-react';
 import BeeAnimatedMascot from './BeeAnimatedMascot';
 import SkeletonLoader from './SkeletonLoader';
+import { askBeeTutor, getSmartFallbackAnswer } from '../services/geminiService';
 import { FormattedMessageText } from '../utils/formatText';
 
 export default function AskBeeAnything() {
@@ -33,12 +34,10 @@ export default function AskBeeAnything() {
 
     try {
       const reply = await askBeeTutor(text, 'General AI Q&A Studio');
-      setMessages((prev) => [...prev, { id: 'bee-' + Date.now(), sender: 'bee', text: reply }]);
+      setMessages((prev) => [...prev, { id: 'bee-' + Date.now(), sender: 'bee', text: reply || getSmartFallbackAnswer(text, 'General AI Q&A Studio') }]);
     } catch (e) {
-      setMessages((prev) => [
-        ...prev,
-        { id: 'bee-err', sender: 'bee', text: 'Bzzz! Bee experienced a temporary connection hiccup. Please try again!' }
-      ]);
+      const fallback = getSmartFallbackAnswer(text, 'General AI Q&A Studio');
+      setMessages((prev) => [...prev, { id: 'bee-' + Date.now(), sender: 'bee', text: fallback }]);
     } finally {
       setLoading(false);
     }
