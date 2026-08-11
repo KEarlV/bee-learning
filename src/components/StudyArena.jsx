@@ -1,16 +1,18 @@
 import React, { useState } from 'react';
-import { RotateCcw, Volume2, Sparkles, CheckCircle2, XCircle, Trophy, ArrowRight, Heart, Zap, Bot } from 'lucide-react';
+import { RotateCcw, Volume2, Sparkles, CheckCircle2, XCircle, Trophy, ArrowRight, Heart, Bot } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import BeeAnimatedMascot from './BeeAnimatedMascot';
 import { soundService } from '../services/soundService';
 import { calculateSM2 } from '../services/spacedRepetition';
 import { updateCard } from '../services/storageService';
+import { logActivity } from '../services/activityLogService';
 
 export default function StudyArena({ deck, cards = [], onFinishSession, onAskBee, onClaimXp }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [sessionCompleted, setSessionCompleted] = useState(false);
   const [sessionXpEarned, setSessionXpEarned] = useState(0);
+  const [reviewedCardIds, setReviewedCardIds] = useState(() => new Set());
 
   const currentCard = cards[currentIndex] || null;
 
@@ -27,13 +29,14 @@ export default function StudyArena({ deck, cards = [], onFinishSession, onAskBee
   const handleRating = async (ratingScore) => {
     if (!currentCard) return;
 
-    if (ratingScore >= 4) {
+    const isCorrect = ratingScore >= 4;
+    if (isCorrect) {
       soundService.playCorrectChime();
     } else {
       soundService.playWrongRumble();
     }
 
-    // Calculate SM-2 spaced repetition values
+    // Calculate SM-2 spaced repetition parameters
     const sm2Result = calculateSM2(
       ratingScore,
       currentCard.repetitions || 0,
@@ -41,7 +44,7 @@ export default function StudyArena({ deck, cards = [], onFinishSession, onAskBee
       currentCard.easeFactor || 2.5
     );
 
-    // Save updated parameters to storage
+    // Save updated parameters to Dexie storage
     await updateCard(currentCard.id, {
       repetitions: sm2Result.repetitions,
       intervalDays: sm2Result.intervalDays,
@@ -51,15 +54,29 @@ export default function StudyArena({ deck, cards = [], onFinishSession, onAskBee
       lastReviewedAt: new Date().toISOString()
     });
 
-    const xpGained = ratingScore >= 4 ? 20 : 5;
-    setSessionXpEarned((prev) => prev + xpGained);
-    if (onClaimXp) onClaimXp(xpGained);
+    // XP Rule: strictly ONLY award XP if correct (>= 4) AND card was not already reviewed in this session
+    let cardXpGained = 0;
+    if (isCorrect && !reviewedCardIds.has(currentCard.id)) {
+      cardXpGained = 15;
+      setSessionXpEarned((prev) => prev + cardXpGained);
+      if (onClaimXp) onClaimXp(cardXpGained, `Correct Flashcard Response`);
+      logActivity('Card Correct (+15 XP)', 'Study', { tokens: cardXpGained });
+    }
 
-    // Next card or finish
+    // Track card as reviewed
+    setReviewedCardIds((prev) => new Set(prev).add(currentCard.id));
+
+    // Advance to next card or finish session
     if (currentIndex + 1 < cards.length) {
       setIsFlipped(false);
       setCurrentIndex((prev) => prev + 1);
     } else {
+      // SET COMPLETION BONUS: Award +50 XP bonus for completing the entire deck set
+      const completionBonus = 50;
+      setSessionXpEarned((prev) => prev + completionBonus);
+      if (onClaimXp) onClaimXp(completionBonus, `Deck Completion Bonus (+50 XP)`);
+      logActivity(`Deck Completed (${deck?.title || 'Set'})`, 'Study', { tokens: completionBonus });
+
       setSessionCompleted(true);
       soundService.playRoundCompleteFanfare();
       try {
@@ -70,11 +87,11 @@ export default function StudyArena({ deck, cards = [], onFinishSession, onAskBee
 
   if (!cards.length) {
     return (
-      <div className="glass-panel p-8 text-center max-w-md mx-auto space-y-4 my-10">
+      <div className="glass-panel p-8 text-center max-w-md mx-auto space-y-4 my-10 select-none">
         <BeeAnimatedMascot size="lg" animated={true} speechBubble="No cards yet!" />
         <h3 className="text-xl font-bold text-white font-display">This deck has no cards</h3>
-        <p className="text-xs text-slate-400">Scan a document or create cards to start studying!</p>
-        <button onClick={onFinishSession} className="btn-primary text-xs px-4 mx-auto">
+        <p className="text-xs text-slate-400">Use AI Scanner Studio to generate cards for this deck!</p>
+        <button onClick={onFinishSession} className="btn-primary text-xs px-4 mx-auto font-bold">
           Back to Dashboard
         </button>
       </div>
@@ -84,19 +101,19 @@ export default function StudyArena({ deck, cards = [], onFinishSession, onAskBee
   if (sessionCompleted) {
     return (
       <div className="glass-panel p-8 text-center max-w-lg mx-auto space-y-5 my-6 border-sky-500/40 select-none">
-        <BeeAnimatedMascot size="splash" animated={true} flightPath={true} speechBubble="Gizmo Round Complete!" />
+        <BeeAnimatedMascot size="splash" animated={true} flightPath={true} speechBubble="Deck Set Complete!" />
         <div>
-          <span className="text-xs font-extrabold text-amber-400 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
-            + {sessionXpEarned} User XP Earned!
+          <span className="text-xs font-extrabold text-amber-400 bg-amber-500/10 px-3.5 py-1.5 rounded-full border border-amber-500/30">
+            + {sessionXpEarned} Total Session XP Earned! 🎉
           </span>
-          <h2 className="text-3xl font-extrabold text-white font-display mt-2">Study Session Complete!</h2>
+          <h2 className="text-3xl font-extrabold text-white font-display mt-3">Study Session Complete!</h2>
           <p className="text-xs text-slate-300 mt-1">
-            You reviewed all {cards.length} cards in <strong>{deck?.title}</strong>. Your memory intervals have been updated!
+            You reviewed all {cards.length} cards in <strong>{deck?.title}</strong> and earned a +50 XP Set Completion Bonus!
           </p>
         </div>
 
         <div className="pt-2 flex justify-center gap-3">
-          <button onClick={onFinishSession} className="btn-primary text-xs py-2.5 px-5">
+          <button onClick={onFinishSession} className="btn-primary text-xs py-2.5 px-5 font-bold">
             Back to Dashboard <ArrowRight size={15} />
           </button>
         </div>
@@ -116,7 +133,6 @@ export default function StudyArena({ deck, cards = [], onFinishSession, onAskBee
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Unlimited Hearts Badge */}
           <div className="flex items-center gap-1 bg-rose-500/15 border border-rose-500/30 text-rose-400 px-2.5 py-1 rounded-xl text-xs font-bold">
             <Heart size={14} className="fill-rose-500 text-rose-500 animate-pulse" />
             <span>∞ Unlimited</span>
@@ -129,7 +145,7 @@ export default function StudyArena({ deck, cards = [], onFinishSession, onAskBee
         </div>
       </div>
 
-      {/* Progress Line */}
+      {/* Progress Bar */}
       <div className="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden">
         <div
           className="h-full bg-gradient-to-r from-sky-400 to-indigo-500 transition-all duration-300"
@@ -147,7 +163,6 @@ export default function StudyArena({ deck, cards = [], onFinishSession, onAskBee
             {isFlipped ? 'Answer Back' : 'Question Prompt'}
           </span>
           <div className="flex items-center gap-1">
-            {/* Audio TTS Speaker Button */}
             <button
               onClick={(e) => handleSpeakText(e, isFlipped ? currentCard.backContent : currentCard.frontContent)}
               className="p-1.5 rounded-lg text-slate-400 hover:text-sky-400 hover:bg-slate-800 transition-all"
@@ -194,31 +209,31 @@ export default function StudyArena({ deck, cards = [], onFinishSession, onAskBee
         <div className="grid grid-cols-4 gap-2">
           <button
             onClick={() => handleRating(1)}
-            className="btn-secondary text-xs justify-center border-rose-500/30 text-rose-400 py-3"
+            className="btn-secondary text-xs justify-center border-rose-500/30 text-rose-400 py-3 font-bold"
           >
-            <XCircle size={15} /> Again
+            <XCircle size={15} /> Again (0 XP)
           </button>
           <button
             onClick={() => handleRating(3)}
-            className="btn-secondary text-xs justify-center border-amber-500/30 text-amber-300 py-3"
+            className="btn-secondary text-xs justify-center border-amber-500/30 text-amber-300 py-3 font-bold"
           >
-            Hard
+            Hard (0 XP)
           </button>
           <button
             onClick={() => handleRating(4)}
-            className="btn-secondary text-xs justify-center border-sky-500/30 text-sky-300 py-3"
+            className="btn-secondary text-xs justify-center border-sky-500/30 text-sky-300 py-3 font-bold"
           >
-            Good
+            Good (+15 XP)
           </button>
           <button
             onClick={() => handleRating(5)}
-            className="btn-primary text-xs justify-center py-3"
+            className="btn-primary text-xs justify-center py-3 font-bold"
           >
-            <CheckCircle2 size={15} /> Easy
+            <CheckCircle2 size={15} /> Easy (+15 XP)
           </button>
         </div>
       ) : (
-        <button onClick={handleFlip} className="w-full btn-primary text-xs py-3 justify-center">
+        <button onClick={handleFlip} className="w-full btn-primary text-xs py-3 justify-center font-bold">
           Reveal Answer
         </button>
       )}

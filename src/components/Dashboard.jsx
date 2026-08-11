@@ -139,46 +139,59 @@ export default function Dashboard({ userStats, onStartSession, onOpenScan, onNav
           </button>
         </div>
 
-        {/* Decks grid — 1 col mobile, 2 col md, 3 col lg */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {decks.map((deck) => (
-            <div
-              key={deck.id}
-              onClick={() => onStartSession(deck)}
-              className="glass-panel p-4 glass-panel-interactive flex flex-col justify-between space-y-3 border-slate-800 relative group"
-            >
-              <div>
-                <div className="flex items-center justify-between text-xs mb-1.5">
-                  <span className="font-bold text-[10px] text-sky-400 bg-sky-500/10 px-2 py-0.5 rounded-full border border-sky-500/20">
-                    {deck.subjectCategory}
-                  </span>
-                  <button
-                    onClick={(e) => handleDeleteDeck(deck.id, e)}
-                    className="p-1 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-slate-800 opacity-0 group-hover:opacity-100 transition-opacity"
-                    title="Delete Deck"
-                  >
-                    <Trash2 size={14} />
-                  </button>
+        {/* Decks grid or Empty State */}
+        {decks.length === 0 ? (
+          <div className="glass-panel p-8 text-center space-y-3 border-slate-800/80">
+            <BeeAnimatedMascot size="md" animated={true} speechBubble="Create your first deck!" className="mx-auto" />
+            <h3 className="text-base font-bold text-white font-display">No Study Decks Yet</h3>
+            <p className="text-xs text-slate-400 max-w-sm mx-auto">
+              Scan a textbook image, upload a PDF, or paste study notes in AI Scan Studio to generate active recall cards!
+            </p>
+            <button onClick={onOpenScan} className="btn-primary text-xs py-2 px-4 mx-auto font-bold">
+              <Sparkles size={15} /> AI Scan Document to Build Deck
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {decks.map((deck) => (
+              <div
+                key={deck.id}
+                onClick={() => onStartSession(deck)}
+                className="glass-panel p-4 glass-panel-interactive flex flex-col justify-between space-y-3 border-slate-800 relative group"
+              >
+                <div>
+                  <div className="flex items-center justify-between text-xs mb-1.5">
+                    <span className="font-bold text-[10px] text-sky-400 bg-sky-500/10 px-2 py-0.5 rounded-full border border-sky-500/20">
+                      {deck.subjectCategory}
+                    </span>
+                    <button
+                      onClick={(e) => handleDeleteDeck(deck.id, e)}
+                      className="p-1 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-slate-800 opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="Delete Deck"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+
+                  <h3 className="text-base font-bold text-white group-hover:text-sky-300 transition-colors">
+                    {deck.title}
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-1 line-clamp-2">
+                    {deck.description}
+                  </p>
                 </div>
 
-                <h3 className="text-base font-bold text-white group-hover:text-sky-300 transition-colors">
-                  {deck.title}
-                </h3>
-                <p className="text-xs text-slate-400 mt-1 line-clamp-2">
-                  {deck.description}
-                </p>
+                <div className="flex items-center justify-between border-t border-slate-800/80 pt-2.5 text-xs text-slate-400">
+                  <span className="text-[11px] font-medium">{deck.cardCount ?? 0} cards due</span>
+                  <span className="btn-primary text-[10px] py-1 px-2.5">
+                    <Play size={10} fill="currentColor" />
+                    Study Now
+                  </span>
+                </div>
               </div>
-
-              <div className="flex items-center justify-between border-t border-slate-800/80 pt-2.5 text-xs text-slate-400">
-                <span className="text-[11px] font-medium">{deck.cardCount ?? 0} cards due</span>
-                <span className="btn-primary text-[10px] py-1 px-2.5">
-                  <Play size={10} fill="currentColor" />
-                  Study Now
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <StreakCalendarModal

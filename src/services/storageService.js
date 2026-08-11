@@ -14,120 +14,32 @@ export async function updateCard(cardId, updates) {
   await db.cards.update(cardId, updates);
 }
 
-// Seed Initial Sample Decks safely using put / bulkPut
+// Storage Initialization — Clean start, no seeded/dummy decks!
 export async function initStorage() {
   try {
-    const deckCount = await db.decks.count();
+    const stats = await db.userStats.get('local_user');
 
-    if (deckCount === 0) {
-      const defaultDeckId = 'deck-bio-101';
-      const csDeckId = 'deck-cs-101';
-      const spanishDeckId = 'deck-es-101';
+    if (!stats) {
+      const todayDate = new Date().toISOString().split('T')[0];
 
-      const nowIso = new Date().toISOString();
-      const todayDate = nowIso.split('T')[0];
-
-      // Seed Decks safely
-      await db.decks.bulkPut([
-        {
-          id: defaultDeckId,
-          title: 'Cell Biology & Organelles',
-          description: 'Key structures, functions, ATP synthesis, and cell membranes.',
-          subjectCategory: 'Science',
-          tags: ['biology', 'exam-prep', 'diagrams'],
-          createdAt: nowIso,
-          updatedAt: nowIso
-        },
-        {
-          id: csDeckId,
-          title: 'JavaScript & Web Tech Essentials',
-          description: 'Promises, Async/Await, Closures, DOM, and HTTP methods.',
-          subjectCategory: 'Computer Science',
-          tags: ['js', 'programming', 'frontend'],
-          createdAt: nowIso,
-          updatedAt: nowIso
-        },
-        {
-          id: spanishDeckId,
-          title: 'Spanish Vocabulary & Travel',
-          description: 'Essential phrases, greetings, directions, and dining.',
-          subjectCategory: 'Language',
-          tags: ['spanish', 'phrases'],
-          createdAt: nowIso,
-          updatedAt: nowIso
-        }
-      ]);
-
-      // Seed Sample Cards safely
-      await db.cards.bulkPut([
-        {
-          id: 'card-bio-1',
-          deckId: defaultDeckId,
-          cardType: 'flashcard',
-          frontContent: 'What is the primary function of Mitochondria in cells?',
-          backContent: 'Mitochondria produce ATP through cellular respiration and oxidative phosphorylation.',
-          hintText: 'Known as the powerhouse of the cell.',
-          dynamicMnemonic: 'Mighty Mitochondria = Power Plant generating ATP electricity!',
-          easeFactor: 2.5,
-          intervalDays: 0,
-          repetitions: 0,
-          dueDate: todayDate,
-          status: 'new'
-        },
-        {
-          id: 'card-bio-2',
-          deckId: defaultDeckId,
-          cardType: 'multiple_choice',
-          frontContent: 'Which organelle is responsible for protein synthesis?',
-          backContent: 'Ribosomes translate mRNA into amino acid chains (proteins).',
-          options: ['Ribosome', 'Golgi Apparatus', 'Lysosome', 'Smooth ER'],
-          hintText: 'Can be free in cytoplasm or bound to Rough ER.',
-          easeFactor: 2.5,
-          intervalDays: 0,
-          repetitions: 0,
-          dueDate: todayDate,
-          status: 'new'
-        },
-        {
-          id: 'card-cs-1',
-          deckId: csDeckId,
-          cardType: 'flashcard',
-          frontContent: 'What is a Closure in JavaScript?',
-          backContent: 'A closure is a function bundled together with references to its surrounding state.',
-          hintText: 'Inner functions retain outer scope variables.',
-          easeFactor: 2.5,
-          intervalDays: 0,
-          repetitions: 0,
-          dueDate: todayDate,
-          status: 'new'
-        }
-      ]);
-
-      // Seed User Stats safely
+      // Seed initial clean User Stats for local/guest user
       await db.userStats.put({
         userId: 'local_user',
-        totalXp: 350,
-        weeklyXp: 350,
-        leagueTier: 'Gold',
-        currentStreak: 5,
-        longestStreak: 12,
+        totalXp: 0,
+        weeklyXp: 0,
+        leagueTier: 'Bronze',
+        currentStreak: 1,
+        longestStreak: 1,
         lastActiveDate: todayDate,
         dailyGoalTarget: 20,
-        cardsStudiedToday: 8,
-        cardsMastered: 14,
-        predictedExamScore: 88,
+        cardsStudiedToday: 0,
+        cardsMastered: 0,
+        predictedExamScore: 0,
         soundEnabled: true,
         soundVolume: 0.8,
         unlimitedHearts: true,
-        level: 4
+        level: 1
       });
-
-      // Seed Leaderboard Entries safely
-      await db.leaderboardEntries.bulkPut([
-        { id: 'user-1', userId: 'user-alex', username: 'Alex_Mastery', avatarUrl: '/bee_frame_1.png', weeklyXp: 820, leagueTier: 'Gold', rankPosition: 1, streakDays: 14, isCurrentUser: false },
-        { id: 'user-2', userId: 'user-sophia', username: 'Sophia_Brain', avatarUrl: '/bee_frame_2.png', weeklyXp: 640, leagueTier: 'Gold', rankPosition: 2, streakDays: 9, isCurrentUser: false },
-        { id: 'user-3', userId: 'local_user', username: 'You (Bee Learner)', avatarUrl: '/bee_frame_4.png', weeklyXp: 350, leagueTier: 'Gold', rankPosition: 3, streakDays: 5, isCurrentUser: true }
-      ]);
     }
   } catch (err) {
     console.warn('Storage init warning (handled):', err);
@@ -141,20 +53,20 @@ export async function getUserStats() {
   if (!stats) {
     stats = {
       userId: 'local_user',
-      totalXp: 350,
-      weeklyXp: 350,
-      leagueTier: 'Gold',
-      currentStreak: 5,
-      longestStreak: 12,
+      totalXp: 0,
+      weeklyXp: 0,
+      leagueTier: 'Bronze',
+      currentStreak: 1,
+      longestStreak: 1,
       lastActiveDate: new Date().toISOString().split('T')[0],
       dailyGoalTarget: 20,
-      cardsStudiedToday: 8,
-      cardsMastered: 14,
-      predictedExamScore: 88,
+      cardsStudiedToday: 0,
+      cardsMastered: 0,
+      predictedExamScore: 0,
       soundEnabled: true,
       soundVolume: 0.8,
       unlimitedHearts: true,
-      level: 4
+      level: 1
     };
     await db.userStats.put(stats);
   }
