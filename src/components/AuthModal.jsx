@@ -109,7 +109,14 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, onLogout, cu
         handleClose();
       }
     } catch (err) {
-      setError(err.message || 'Something went wrong. Try again.');
+      const msg = err.message || '';
+      if (msg.includes('Invalid login credentials')) {
+        setError('Invalid email or password. Check your details or click "Create Account".');
+      } else if (msg.includes('Email not confirmed')) {
+        setError('Email address not confirmed yet. Please check your inbox or contact your admin.');
+      } else {
+        setError(msg || 'Something went wrong during sign in. Please try again.');
+      }
       setIsSubmitting(false);
     }
   };
