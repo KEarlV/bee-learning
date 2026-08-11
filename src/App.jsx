@@ -117,24 +117,43 @@ export default function App() {
   };
 
   const handleClaimXp = async (amount) => {
-    const currentXp = userStats?.totalXp ?? 0;
-    const currentWeekly = userStats?.weeklyXp ?? 0;
-    const newTotal = currentXp + amount;
-    const newWeekly = currentWeekly + amount;
-
-    const updated = { ...userStats, totalXp: newTotal, weeklyXp: newWeekly };
-    setUserStats(updated);
-    await updateUserStats({ totalXp: newTotal, weeklyXp: newWeekly });
+    let currentXp = userStats?.totalXp ?? 0;
+    let currentWeekly = userStats?.weeklyXp ?? 0;
 
     if (currentUser?.userId && currentUser.userId !== 'local_user') {
       const supabase = getAdminSupabaseClient();
       if (supabase) {
+        const { data } = await supabase
+          .from('user_stats')
+          .select('total_xp, weekly_xp')
+          .eq('user_id', currentUser.userId)
+          .maybeSingle();
+
+        if (data) {
+          currentXp = data.total_xp ?? 0;
+          currentWeekly = data.weekly_xp ?? 0;
+        }
+
+        const newTotal = currentXp + amount;
+        const newWeekly = currentWeekly + amount;
+
         await supabase
           .from('user_stats')
           .update({ total_xp: newTotal, weekly_xp: newWeekly })
           .eq('user_id', currentUser.userId);
+
+        const updated = { ...userStats, totalXp: newTotal, weeklyXp: newWeekly };
+        setUserStats(updated);
+        await updateUserStats({ totalXp: newTotal, weeklyXp: newWeekly });
+        return;
       }
     }
+
+    const newTotal = currentXp + amount;
+    const newWeekly = currentWeekly + amount;
+    const updated = { ...userStats, totalXp: newTotal, weeklyXp: newWeekly };
+    setUserStats(updated);
+    await updateUserStats({ totalXp: newTotal, weeklyXp: newWeekly });
   };
 
   const handleUpdateUserStats = async (updates) => {

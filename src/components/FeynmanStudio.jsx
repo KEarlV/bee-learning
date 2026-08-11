@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mic, Send, Sparkles, CheckCircle2, AlertCircle, Loader2, Award, Zap } from 'lucide-react';
+import { Mic, Send, Sparkles, CheckCircle2, AlertCircle, Loader2, Award, Zap, Check } from 'lucide-react';
 import BeeAnimatedMascot from './BeeAnimatedMascot';
 import { evaluateFeynmanExplanation } from '../services/geminiService';
 import { logActivity } from '../services/activityLogService';
@@ -11,12 +11,14 @@ export default function FeynmanStudio({ onClaimXp }) {
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [evaluationResult, setEvaluationResult] = useState(null);
   const [earnedXp, setEarnedXp] = useState(0);
+  const [xpClaimed, setXpClaimed] = useState(false);
 
   const handleEvaluate = async () => {
     if (!userExplanation.trim()) return;
     setIsEvaluating(true);
     setEvaluationResult(null);
     setEarnedXp(0);
+    setXpClaimed(false);
 
     try {
       const result = await evaluateFeynmanExplanation(concept, targetAnswer, userExplanation);
@@ -27,9 +29,10 @@ export default function FeynmanStudio({ onClaimXp }) {
       const xp = score >= 80 ? 100 : score >= 50 ? 50 : 25;
       setEarnedXp(xp);
 
-      // Claim XP
+      // Automatically claim XP
       if (onClaimXp) {
-        onClaimXp(xp, `Feynman Explanation: ${concept} (${score}%)`);
+        await onClaimXp(xp, `Feynman Explanation: ${concept} (${score}%)`);
+        setXpClaimed(true);
       }
 
       // Log activity
@@ -39,6 +42,13 @@ export default function FeynmanStudio({ onClaimXp }) {
       console.error('Feynman evaluation error:', e);
     } finally {
       setIsEvaluating(false);
+    }
+  };
+
+  const handleManualClaim = async () => {
+    if (earnedXp > 0 && onClaimXp) {
+      await onClaimXp(earnedXp, `Feynman Manual Claim: ${concept}`);
+      setXpClaimed(true);
     }
   };
 
@@ -52,7 +62,7 @@ export default function FeynmanStudio({ onClaimXp }) {
             <h2 className="text-2xl font-bold text-white font-display">Feynman Method Studio</h2>
           </div>
           <p className="text-sm text-slate-400 mt-1">
-            The best way to test true mastery is teaching a concept. Explain it to Bee and earn XP!
+            The best way to test true mastery is teaching a concept. Explain it to Bee and earn up to +100 XP!
           </p>
         </div>
         <BeeAnimatedMascot size="lg" animated={true} speechBubble="Explain it to Bee!" />
@@ -79,14 +89,14 @@ export default function FeynmanStudio({ onClaimXp }) {
               value={userExplanation}
               onChange={(e) => setUserExplanation(e.target.value)}
               placeholder="Explain how this works in your own words, as if teaching a beginner..."
-              className="w-full h-44 bg-slate-900 border border-slate-800 focus:border-sky-500 rounded-xl p-3 text-sm text-slate-200 placeholder-slate-500 outline-none resize-none"
+              className="w-full h-44 bg-slate-900 border border-slate-800 focus:border-sky-500 rounded-xl p-3.5 text-sm text-slate-200 placeholder-slate-500 outline-none resize-none"
             />
           </div>
 
           <button
             onClick={handleEvaluate}
             disabled={isEvaluating || !userExplanation.trim()}
-            className="w-full btn-primary justify-center text-sm py-3 disabled:opacity-50"
+            className="w-full btn-primary justify-center text-sm py-3 disabled:opacity-50 font-bold"
           >
             {isEvaluating ? (
               <>
@@ -114,16 +124,38 @@ export default function FeynmanStudio({ onClaimXp }) {
                 <span className="text-2xl font-extrabold text-sky-400">{evaluationResult.score}%</span>
               </div>
 
-              {/* XP Award Banner */}
+              {/* XP Award Banner + Claim Button */}
               {earnedXp > 0 && (
-                <div className="p-3 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-between">
+                <div className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-500/20 via-orange-500/15 to-amber-500/20 border border-amber-500/40 flex items-center justify-between gap-2 shadow-lg">
                   <div className="flex items-center gap-2 text-amber-300 font-bold text-xs">
-                    <Zap size={16} className="fill-amber-400 text-amber-400" />
-                    <span>+{earnedXp} XP Earned!</span>
+                    <Zap size={18} className="fill-amber-400 text-amber-400 shrink-0 animate-bounce" />
+                    <div>
+                      <p className="text-sm font-extrabold text-amber-300">+{earnedXp} XP Awarded!</p>
+                      <p className="text-[10px] text-amber-400/80">Mastery score: {evaluationResult.score}%</p>
+                    </div>
                   </div>
-                  <span className="text-[10px] font-bold text-amber-400/80 bg-amber-500/20 px-2 py-0.5 rounded-full">
-                    MASTERY BONUS
-                  </span>
+
+                  <button
+                    onClick={handleManualClaim}
+                    disabled={xpClaimed}
+                    className={`text-xs px-3 py-1.5 rounded-xl font-bold flex items-center gap-1 transition-all ${
+                      xpClaimed
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 cursor-default'
+                        : 'btn-primary text-slate-950 bg-amber-400 hover:bg-amber-300'
+                    }`}
+                  >
+                    {xpClaimed ? (
+                      <>
+                        <Check size={14} />
+                        Claimed
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles size={14} />
+                        Claim +{earnedXp} XP
+                      </>
+                    )}
+                  </button>
                 </div>
               )}
 
@@ -162,7 +194,7 @@ export default function FeynmanStudio({ onClaimXp }) {
               <BeeAnimatedMascot size="lg" animated={true} />
               <h4 className="text-base font-bold text-slate-300">Ready for Bee's Feedback?</h4>
               <p className="text-xs text-slate-400 max-w-xs mx-auto">
-                Type your explanation on the left and click submit. Bee will evaluate your grasp and grant XP!
+                Type your explanation on the left and click submit. Bee will evaluate your grasp and grant up to +100 XP!
               </p>
             </div>
           )}

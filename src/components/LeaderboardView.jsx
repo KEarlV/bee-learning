@@ -48,7 +48,7 @@ export default function LeaderboardView() {
         data.map((u, idx) => {
           const userXp = u.total_xp ?? 0;
           let streak = u.current_streak ?? 1;
-          if (userXp === 0 || streak > 30) streak = 1;
+          if (streak === 5 || userXp < 200 || streak > 30 || !streak) streak = 1;
           return {
             rank:      idx + 1,
             userId:    u.user_id,
