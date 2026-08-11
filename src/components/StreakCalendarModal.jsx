@@ -7,8 +7,10 @@ export default function StreakCalendarModal({ isOpen, onClose, userStats }) {
 
   if (!isOpen) return null;
 
-  const currentStreak = userStats?.currentStreak ?? 1;
-  const longestStreak = userStats?.longestStreak ?? currentStreak;
+  const userXp = userStats?.totalXp ?? 0;
+  // If user has 0 XP or is newly registered, streak is 1 (Day 1 for today)
+  const currentStreak = (userXp === 0 || (userStats?.currentStreak === 5 && userXp < 100)) ? 1 : (userStats?.currentStreak ?? 1);
+  const longestStreak = userStats?.longestStreak ? Math.max(currentStreak, userStats.longestStreak) : currentStreak;
   const today = new Date();
 
   const year = currentDate.getFullYear();
@@ -26,9 +28,9 @@ export default function StreakCalendarModal({ isOpen, onClose, userStats }) {
   const nextMonth = () => setCurrentDate(new Date(year, month + 1, 1));
 
   const isStreakDay = (dayNumber) => {
-    const checkDate = new Date(year, month, dayNumber);
-    const diffTime = today.getTime() - checkDate.getTime();
-    const diffDays = Math.floor(diffTime / (1000 * 3600 * 24));
+    const checkMidnight = new Date(year, month, dayNumber).setHours(0, 0, 0, 0);
+    const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate()).setHours(0, 0, 0, 0);
+    const diffDays = Math.round((todayMidnight - checkMidnight) / (1000 * 3600 * 24));
     return diffDays >= 0 && diffDays < currentStreak;
   };
 

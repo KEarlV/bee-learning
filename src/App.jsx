@@ -49,7 +49,7 @@ export default function App() {
 
         if (data) {
           let streakVal = data.current_streak ?? 1;
-          if ((data.total_xp ?? 0) === 0 && streakVal !== 1) {
+          if ((data.total_xp ?? 0) < 100 || streakVal === 5) {
             streakVal = 1;
             supabase.from('user_stats').update({ current_streak: 1, longest_streak: 1 }).eq('user_id', currentUser.userId);
           }
