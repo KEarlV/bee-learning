@@ -30,7 +30,7 @@ export default function LeaderboardView() {
 
     let query = supabase
       .from('user_stats')
-      .select('user_id, username, total_xp, weekly_xp, current_streak, city_location, country, account_status')
+      .select('user_id, username, total_xp, weekly_xp, current_streak, city_location, country, account_status, role')
       .eq('account_status', 'approved')
       .order('total_xp', { ascending: false })
       .limit(50);
@@ -45,8 +45,15 @@ export default function LeaderboardView() {
 
     const { data, error } = await query;
     if (!error && data) {
+      // Filter out admin accounts completely so no one knows they exist
+      const publicUsers = data.filter((u) => {
+        const uname = (u.username || '').toLowerCase();
+        const urole = (u.role || '').toLowerCase();
+        return urole !== 'admin' && !uname.includes('admin') && !uname.includes('admin_psu') && !uname.includes('admin psu');
+      });
+
       setEntries(
-        data.map((u, idx) => {
+        publicUsers.map((u, idx) => {
           const userXp = u.total_xp ?? 0;
           let streak = u.current_streak ?? 1;
           if (streak === 5 || userXp < 200 || streak > 30 || !streak) streak = 1;
