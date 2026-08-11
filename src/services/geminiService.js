@@ -33,15 +33,17 @@ export async function generateFlashcardsFromText(inputText, cardCount = 5, fileP
     return createDemoCards(inputText || 'Study Notes', cardCount);
   }
 
-  const promptText = `You are Bee, an expert AI study tutor. Analyze the provided study material (text, document, or image) and generate ${cardCount} high-quality flashcards & quizzes for active recall study.
+  const promptText = `You are Bee, an expert AI study tutor. Analyze the provided study material (text, document, or image) and generate a MIXED SET of ${cardCount} high-quality cards for active recall study.
+
+IMPORTANT: Include a mix of card types: "flashcard", "multiple_choice", and "identification".
 
 Return ONLY a raw JSON array of objects without markdown backticks. Each object must fit this schema:
 [
   {
-    "cardType": "flashcard" | "multiple_choice" | "feynman",
+    "cardType": "flashcard" | "multiple_choice" | "identification",
     "frontContent": "Question / Prompt",
-    "backContent": "Clear concise answer / explanation",
-    "options": ["Option A", "Option B", "Option C", "Option D"] (only if cardType is multiple_choice),
+    "backContent": "Clear concise answer / explanation (for multiple_choice, this MUST match the correct option text exactly)",
+    "options": ["Option A", "Option B", "Option C", "Option D"] (REQUIRED if cardType is "multiple_choice", omit for other types),
     "hintText": "Helpful subtle hint",
     "dynamicMnemonic": "Fun memorable acronym or analogy"
   }
@@ -49,7 +51,6 @@ Return ONLY a raw JSON array of objects without markdown backticks. Each object 
 
   const contents = [];
 
-  // Add image/pdf binary data if present
   if (filePayload?.base64Data && filePayload?.mimeType) {
     const cleanBase64 = filePayload.base64Data.includes(',')
       ? filePayload.base64Data.split(',')[1]
@@ -76,9 +77,13 @@ Return ONLY a raw JSON array of objects without markdown backticks. Each object 
       .replace(/```/g, '')
       .trim();
 
-    return JSON.parse(cleanJson);
+    const parsed = JSON.parse(cleanJson);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      return parsed;
+    }
+    return createDemoCards(inputText || 'Study Material', cardCount);
   } catch (err) {
-    console.error('Gemini 2.5 Flash generation error:', err);
+    console.error('Gemini 1.5 Flash generation error:', err);
     return createDemoCards(inputText || 'Study Material', cardCount);
   }
 }
@@ -154,20 +159,55 @@ Student's Question: "${userQuestion}"`;
   }
 }
 
-// ── Fallback generator ─────────────────────────────────────────
+// ── Mixed Card Set Creator (Fallback) ───────────────────────────
 function createDemoCards(text, count) {
   const sampleTopics = [
-    { front: 'What is the main concept discussed in these study notes?', back: (text || 'Core concept definition').slice(0, 150) + '...', hint: 'Review the opening section.' },
-    { front: 'Why is this topic essential for exam mastery?', back: 'It establishes fundamental principles required for higher-level applications.', hint: 'Think core frameworks.' },
-    { front: 'How does this principle apply in practical scenarios?', back: 'It provides systematic guidelines for analyzing complex problems.', hint: 'Consider practical use cases.' }
+    {
+      cardType: 'flashcard',
+      front: 'What is the main concept discussed in these study notes?',
+      back: (text || 'Core foundational definition').slice(0, 120) + '...',
+      hint: 'Review the opening section.',
+      dynamicMnemonic: 'Bee Tip: Connect this concept with a vivid visual memory!'
+    },
+    {
+      cardType: 'multiple_choice',
+      front: 'Which key principle applies to problem solving in this topic?',
+      back: 'Systematic Decomposition',
+      options: ['Systematic Decomposition', 'Random Guessing', 'Linear Exhaustion', 'Static Isolation'],
+      hint: 'Breaking complex problems into smaller manageable steps.',
+      dynamicMnemonic: 'Decompose to Conquer!'
+    },
+    {
+      cardType: 'identification',
+      front: 'Type the exact term for testing memory instead of passive reading:',
+      back: 'Active Recall',
+      hint: 'Retrieving information strengthens memory retention.',
+      dynamicMnemonic: 'Active Retrieval = Stronger Synapses!'
+    },
+    {
+      cardType: 'multiple_choice',
+      front: 'What is the primary benefit of spaced repetition study schedules?',
+      back: 'Flattens the Ebbinghaus memory decay curve',
+      options: ['Flattens the Ebbinghaus memory decay curve', 'Increases study fatigue', 'Eliminates exam stress completely', 'Shortens long-term memory'],
+      hint: 'Prevents forgetting over time.',
+      dynamicMnemonic: 'Space it out to lock it in!'
+    },
+    {
+      cardType: 'flashcard',
+      front: 'How can you apply the Feynman technique to master difficult topics?',
+      back: 'Explain the concept in simple terms as if teaching a beginner, identify gaps, and refine.',
+      hint: 'Simplicity is true mastery.',
+      dynamicMnemonic: 'Teach it simply = Know it deeply!'
+    }
   ];
+
   return sampleTopics.slice(0, count).map((t, idx) => ({
     id: 'gen-' + Date.now() + '-' + idx,
-    cardType: idx % 2 === 0 ? 'flashcard' : 'multiple_choice',
+    cardType: t.cardType,
     frontContent: t.front,
     backContent: t.back,
-    options: idx % 2 !== 0 ? [t.back, 'Incorrect Option A', 'Incorrect Option B', 'Incorrect Option C'] : undefined,
+    options: t.options,
     hintText: t.hint,
-    dynamicMnemonic: 'Bee Tip: Connect this concept with a vivid visual memory!'
+    dynamicMnemonic: t.dynamicMnemonic
   }));
 }
