@@ -9,7 +9,7 @@ import UserProfileModal from './UserProfileModal';
 import StreakCalendarModal from './StreakCalendarModal';
 import OfflineBanner from './OfflineBanner';
 import MobileBottomNav from './MobileBottomNav';
-import { soundService } from '../services/soundService';
+import { getTierInfo } from '../utils/tierSystem';
 
 export default function AppShell({
   userStats,
@@ -47,7 +47,7 @@ export default function AppShell({
     { id: 'quick',       label: 'Quick Reviewer',    icon: BookOpen },
     { id: 'askbee',      label: 'Ask Bee Anything',  icon: Bot },
     { id: 'studio',      label: 'AI Scanner Studio', icon: Sparkles },
-    { id: 'leaderboard', label: 'Weekly Leagues',    icon: Trophy, badge: userStats?.leagueTier || 'Gold' },
+    { id: 'leaderboard', label: 'Weekly Leagues',    icon: Trophy, badge: getTierInfo(userXp).full },
     { id: 'feynman',     label: 'Feynman Method',    icon: Mic },
     { id: 'analytics',   label: 'Exam Analytics',    icon: BarChart3 },
   ];

@@ -45,6 +45,8 @@ const TIER_COLORS = {
 const DAILY_LOGIN_XP = 25;
 const LOGIN_DATE_KEY = 'bee_last_login_xp_date';
 
+import { getTierInfo } from '../utils/tierSystem';
+
 export default function AnalyticsView() {
   const [stats, setStats]       = useState(null);
   const [loading, setLoading]   = useState(true);
@@ -163,8 +165,7 @@ export default function AnalyticsView() {
   const longestStreak = stats?.longest_streak || 0;
   const mastered   = stats?.cards_mastered || 0;
   const examScore  = stats?.predicted_exam_score || 0;
-  const tier       = stats?.league_tier || 'Bronze';
-  const tierStyle  = TIER_COLORS[tier] || TIER_COLORS.Bronze;
+  const tierInfo   = getTierInfo(totalXp);
 
   // Retention forecast based on streak (realistic, starts at 50% day 1)
   const retentionBars = [
@@ -250,9 +251,9 @@ export default function AnalyticsView() {
                   {xpIntoLevel} / {xpNeeded} XP to Level {level + 1}
                 </p>
               </div>
-              <div className={`text-center px-3 py-2 rounded-xl border text-xs font-bold ${tierStyle}`}>
+              <div className={`text-center px-3 py-2 rounded-xl border text-xs font-bold ${tierInfo.color}`}>
                 <Trophy size={16} className="mx-auto mb-0.5" />
-                {tier}
+                {tierInfo.badge}
               </div>
             </div>
 

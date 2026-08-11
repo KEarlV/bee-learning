@@ -3,6 +3,7 @@ import { BookOpen, Sparkles, Trophy, Play, Plus, Flame, Heart, Clock, Trash2, Za
 import BeeAnimatedMascot from './BeeAnimatedMascot';
 import DailyQuests from './DailyQuests';
 import StreakCalendarModal from './StreakCalendarModal';
+import { getTierInfo } from '../utils/tierSystem';
 import { db } from '../services/storageService';
 
 
@@ -118,10 +119,12 @@ export default function Dashboard({ userStats, onStartSession, onOpenScan, onNav
             </div>
             <div>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Local Rank ({userStats?.cityLocation?.split(',')[0] || 'Manila'})</p>
-              <h4 className="text-sm font-extrabold text-white">#3 {userStats?.leagueTier || 'Gold'} Tier</h4>
+              <h4 className="text-sm font-extrabold text-white">#3 {getTierInfo(userStats?.totalXp).full}</h4>
             </div>
           </div>
-          <span className="text-[9px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full">{(userStats?.leagueTier || 'Gold').toUpperCase()}</span>
+          <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full border ${getTierInfo(userStats?.totalXp).color}`}>
+            {getTierInfo(userStats?.totalXp).badge}
+          </span>
         </div>
       </div>
 

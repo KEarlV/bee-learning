@@ -3,6 +3,7 @@ import { Trophy, Flame, Zap, Globe, MapPin, Building, Loader2, RefreshCw } from 
 import BeeAnimatedMascot from './BeeAnimatedMascot';
 import { getSupabaseClient } from '../services/supabaseService';
 import { getStoredSession } from '../services/authService';
+import { getTierInfo } from '../utils/tierSystem';
 
 const SCOPES = [
   { id: 'local',         label: 'City',     icon: Building },
@@ -213,15 +214,27 @@ export default function LeaderboardView() {
                   {item.name.charAt(0).toUpperCase()}
                 </div>
 
-                {/* Name + location */}
+                {/* Name + location + Tier division */}
                 <div className="min-w-0">
                   <h4 className="text-xs font-bold text-white flex items-center gap-1.5 truncate">
                     <span className="truncate">{item.name}</span>
                     {item.isYou && (
-                      <span className="text-[9px] font-extrabold bg-sky-500 text-white px-1.5 py-0.5 rounded-full shrink-0">YOU</span>
+                      <span className="text-[9px] font-extrabold uppercase bg-sky-500/20 text-sky-300 border border-sky-400/40 px-1.5 py-0.2 rounded-full shrink-0">
+                        YOU
+                      </span>
                     )}
                   </h4>
-                  <span className="text-[10px] text-slate-500 truncate block">{item.location}</span>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <p className="text-[10px] text-slate-400 truncate">{item.location}</p>
+                    {(() => {
+                      const tierData = getTierInfo(item.xp);
+                      return (
+                        <span className={`text-[9px] font-extrabold px-1.5 py-0.2 rounded-full border shrink-0 ${tierData.color}`}>
+                          {tierData.badge}
+                        </span>
+                      );
+                    })()}
+                  </div>
                 </div>
               </div>
 
