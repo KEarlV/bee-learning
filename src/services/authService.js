@@ -16,12 +16,12 @@ export async function registerUser({ username, password }) {
   const supabase = getSupabaseClient();
   if (!supabase) throw new Error('No Supabase connection.');
 
-  // Check username is not already taken
+  // Check username is not already taken (maybeSingle = no error if not found)
   const { data: existing } = await supabase
     .from('user_stats')
     .select('user_id')
     .ilike('username', username)
-    .single();
+    .maybeSingle();
 
   if (existing) throw new Error('Username already taken. Choose another.');
 
@@ -37,7 +37,7 @@ export async function registerUser({ username, password }) {
       total_xp: 0,
       weekly_xp: 0,
     })
-    .select('user_id, username, account_status, avatar_url')
+    .select('user_id, username, account_status')
     .single();
 
   if (error) throw new Error(error.message);
@@ -51,9 +51,9 @@ export async function loginUser({ username, password }) {
 
   const { data: user, error } = await supabase
     .from('user_stats')
-    .select('user_id, username, password_hash, account_status, avatar_url, total_xp')
+    .select('user_id, username, password_hash, account_status, total_xp')
     .ilike('username', username)
-    .single();
+    .maybeSingle();
 
   if (error || !user) throw new Error('Username not found.');
 
@@ -71,7 +71,7 @@ export async function loginUser({ username, password }) {
   const session = {
     userId: user.user_id,
     username: user.username,
-    avatarUrl: user.avatar_url || null,
+    avatarUrl: null,
     isAuthenticated: true,
     totalXp: user.total_xp || 0,
   };
