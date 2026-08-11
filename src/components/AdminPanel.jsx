@@ -29,6 +29,63 @@ export default function AdminPanel({ onLogout }) {
   const [logsLoading, setLogsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
+  // ── Live 30-Min Event Broadcast State ─────────────────────────
+  const [eventQuestion, setEventQuestion] = useState('What organelle is known as the powerhouse of the cell?');
+  const [eventAnswer, setEventAnswer] = useState('Mitochondria');
+  const [eventXpReward, setEventXpReward] = useState(100);
+  const [eventNotice, setEventNotice] = useState(null);
+  const [isBroadcasting, setIsBroadcasting] = useState(false);
+
+  const sampleEventQuestions = [
+    { q: 'What organelle produces ATP through cellular respiration?', a: 'Mitochondria' },
+    { q: 'What is the capital city of the Philippines?', a: 'Manila' },
+    { q: 'What HTML tag is used for the main top heading on a page?', a: 'h1' },
+    { q: 'What JS keyword declares a block-scoped variable that cannot be reassigned?', a: 'const' },
+    { q: 'What process do plants use to convert sunlight into glucose sugar?', a: 'Photosynthesis' }
+  ];
+
+  const handlePickRandomQuestion = () => {
+    const randomItem = sampleEventQuestions[Math.floor(Math.random() * sampleEventQuestions.length)];
+    setEventQuestion(randomItem.q);
+    setEventAnswer(randomItem.a);
+  };
+
+  const handleLaunchLiveEvent = async (e) => {
+    e.preventDefault();
+    if (!eventQuestion.trim() || !eventAnswer.trim()) return;
+
+    setIsBroadcasting(true);
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+    const eventObj = {
+      id: 'current_event',
+      question: eventQuestion.trim(),
+      correct_answer: eventAnswer.trim(),
+      xp_reward: Number(eventXpReward) || 100,
+      expires_at: expiresAt,
+      is_claimed: false,
+      winner_username: null,
+      created_at: new Date().toISOString()
+    };
+
+    if (supabase) {
+      try {
+        await supabase.from('live_events').upsert(eventObj);
+      } catch (err) {}
+    }
+
+    try {
+      localStorage.setItem('bee_live_event', JSON.stringify({
+        ...eventObj,
+        expires_at: Date.now() + 30 * 60 * 1000
+      }));
+      window.dispatchEvent(new Event('bee_event_update'));
+    } catch (err) {}
+
+    setIsBroadcasting(false);
+    setEventNotice('🚀 Live 30-Minute Flash Quiz Event is now BROADCASTED to all users!');
+    setTimeout(() => setEventNotice(null), 6000);
+  };
+
   const supabase = getAdminSupabaseClient();
 
   // ── Fetch overview stats ─────────────────────────────────────
@@ -225,6 +282,7 @@ export default function AdminPanel({ onLogout }) {
       <div className="border-b border-slate-800 bg-slate-900/50 px-6 flex gap-1 overflow-x-auto">
         {[
           { id: 'overview', label: '📊 Overview' },
+          { id: 'live_event', label: '⚡ Live Event Broadcast (30 Min)' },
           { id: 'users', label: `👥 User Directory & Credentials (${stats.total})` },
           { id: 'approvals', label: `👤 Pending Approvals${pendingCount > 0 ? ` (${pendingCount})` : ''}` },
           { id: 'logs', label: '📋 Activity Logs' },
@@ -300,6 +358,110 @@ export default function AdminPanel({ onLogout }) {
                 );
               })}
             </div>
+          </div>
+        )}
+
+        {/* ── LIVE EVENT BROADCAST ── */}
+        {activeSection === 'live_event' && (
+          <div className="glass-panel p-6 border-amber-500/30 space-y-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                  <Zap size={24} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white font-display flex items-center gap-2">
+                    Live 30-Minute Flash Event Control
+                    <span className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                      REALTIME BROADCAST
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Launch a 30-minute flash quiz question. The first student to answer correctly wins the XP reward!
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handlePickRandomQuestion}
+                className="btn-secondary text-xs py-1.5 px-3 border-amber-500/30 text-amber-300 hover:bg-amber-500/10 font-bold"
+              >
+                🎲 Pick Random Question
+              </button>
+            </div>
+
+            {eventNotice && (
+              <div className="p-3 bg-emerald-500/20 border border-emerald-500/40 rounded-xl text-xs font-bold text-emerald-300 text-center animate-pulse">
+                {eventNotice}
+              </div>
+            )}
+
+            <form onSubmit={handleLaunchLiveEvent} className="space-y-4 max-w-2xl">
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1">
+                  Trivia / Quiz Question Prompt
+                </label>
+                <textarea
+                  value={eventQuestion}
+                  onChange={(e) => setEventQuestion(e.target.value)}
+                  placeholder="Type trivia question..."
+                  className="w-full h-24 bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl p-3 text-xs text-white outline-none resize-none"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">
+                    Expected Correct Answer (Case-Insensitive)
+                  </label>
+                  <input
+                    type="text"
+                    value={eventAnswer}
+                    onChange={(e) => setEventAnswer(e.target.value)}
+                    placeholder="e.g. Mitochondria"
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-3.5 py-2 text-xs text-white outline-none"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-bold text-slate-300">
+                      XP Reward Amount
+                    </label>
+                    <span className="text-xs font-extrabold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+                      +{eventXpReward} XP
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="1"
+                    max="200"
+                    value={eventXpReward}
+                    onChange={(e) => setEventXpReward(e.target.value)}
+                    className="w-full accent-amber-400 cursor-pointer mt-2"
+                  />
+                  <div className="flex justify-between text-[10px] text-slate-500 font-mono mt-1">
+                    <span>1 XP</span>
+                    <span>100 XP</span>
+                    <span>200 XP</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={isBroadcasting || !eventQuestion.trim() || !eventAnswer.trim()}
+                  className="btn-primary text-xs py-3 px-6 font-bold w-full sm:w-auto"
+                >
+                  <Zap size={16} className="fill-current" />
+                  {isBroadcasting ? 'Broadcasting Event...' : '🚀 Broadcast 30-Minute Live Flash Event'}
+                </button>
+              </div>
+            </form>
           </div>
         )}
 

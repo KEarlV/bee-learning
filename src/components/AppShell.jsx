@@ -8,7 +8,7 @@ import AuthModal from './AuthModal';
 import UserProfileModal from './UserProfileModal';
 import StreakCalendarModal from './StreakCalendarModal';
 import OfflineBanner from './OfflineBanner';
-import MobileBottomNav from './MobileBottomNav';
+import LiveEventBanner from './LiveEventBanner';
 import { getTierInfo } from '../utils/tierSystem';
 
 export default function AppShell({
@@ -55,6 +55,7 @@ export default function AppShell({
   return (
     <div className="h-screen w-screen bg-slate-950 text-slate-100 flex flex-col font-sans overflow-hidden select-none">
       <OfflineBanner />
+      <LiveEventBanner currentSession={session} onClaimXp={onClaimXp} />
 
       {/* ── Top Header ─────────────────────────────────────────── */}
       <header className="h-14 sm:h-16 shrink-0 bg-slate-900/95 backdrop-blur-xl border-b border-slate-800/80 px-3 sm:px-5 flex items-center justify-between z-40">
