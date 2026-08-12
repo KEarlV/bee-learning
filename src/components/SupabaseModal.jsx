@@ -22,8 +22,8 @@ export default function SupabaseModal({ isOpen, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md select-none">
-      <div className="glass-panel w-full max-w-md p-6 relative border-emerald-500/40 shadow-2xl space-y-5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 select-none">
+      <div className="glass-panel w-full max-w-md p-6 relative border-emerald-500/40 shadow-2xl space-y-5 backdrop-blur-2xl bg-slate-900/90">
         {/* Close Button */}
         <button
           onClick={onClose}

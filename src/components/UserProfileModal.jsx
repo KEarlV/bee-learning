@@ -69,8 +69,8 @@ export default function UserProfileModal({ isOpen, onClose, currentUser, userSta
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md select-none">
-      <div className="glass-panel w-full max-w-lg p-6 relative border-sky-500/40 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 select-none">
+      <div className="glass-panel w-full max-w-lg p-6 relative border-sky-500/40 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto backdrop-blur-2xl bg-slate-900/90">
         {/* Close Button */}
         <button
           onClick={onClose}

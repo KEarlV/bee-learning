@@ -55,8 +55,8 @@ export default function StreakCalendarModal({ isOpen, onClose, userStats }) {
   const daysOfWeek = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-md select-none overflow-y-auto">
-      <div className="glass-panel w-full max-w-md p-4 sm:p-6 relative border-amber-500/40 shadow-2xl space-y-3.5 sm:space-y-4 rounded-3xl max-h-[92vh] overflow-y-auto my-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 select-none overflow-y-auto">
+      <div className="glass-panel w-full max-w-md p-4 sm:p-6 relative border-amber-500/40 shadow-2xl space-y-3.5 sm:space-y-4 rounded-3xl max-h-[92vh] overflow-y-auto my-auto backdrop-blur-2xl bg-slate-900/90">
         {/* Close Button */}
         <button
           onClick={onClose}

@@ -25,8 +25,8 @@ export default function OnboardingModal({ isOpen, onClose, onComplete }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md select-none">
-      <div className="glass-panel w-full max-w-lg p-6 relative border-sky-500/40 shadow-2xl space-y-5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 select-none">
+      <div className="glass-panel w-full max-w-lg p-6 relative border-sky-500/40 shadow-2xl space-y-5 backdrop-blur-2xl bg-slate-900/90">
         {/* Header */}
         <div className="text-center space-y-2">
           <BeeAnimatedMascot size="lg" animated={true} flightPath={true} speechBubble="Let's set up your profile!" className="mx-auto" />

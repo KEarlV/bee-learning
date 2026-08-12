@@ -45,11 +45,11 @@ export default function ConfirmModal({
       };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md select-none animate-in fade-in-0 duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 select-none animate-in fade-in-0 duration-200">
       {/* Ambient background glow */}
       <div className={`absolute w-72 h-72 rounded-full blur-3xl opacity-20 pointer-events-none ${isDanger ? 'bg-rose-500' : isWarning ? 'bg-amber-500' : 'bg-sky-500'}`} />
 
-      <div className={`glass-panel w-full max-w-md p-6 relative ${themeClasses.panelBorder} shadow-2xl rounded-3xl space-y-5 transform transition-all duration-300 scale-100 z-10 overflow-hidden`}>
+      <div className={`glass-panel w-full max-w-md p-6 relative ${themeClasses.panelBorder} shadow-2xl rounded-3xl space-y-5 transform transition-all duration-300 scale-100 z-10 overflow-hidden backdrop-blur-2xl bg-slate-900/90`}>
         {/* Top Accent Line */}
         <div className={`absolute top-0 inset-x-0 h-1 bg-gradient-to-r ${isDanger ? 'from-transparent via-rose-500 to-transparent' : isWarning ? 'from-transparent via-amber-500 to-transparent' : 'from-transparent via-sky-500 to-transparent'}`} />
 
