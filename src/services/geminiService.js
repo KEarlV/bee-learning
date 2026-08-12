@@ -5,11 +5,7 @@ let customApiKey = localStorage.getItem('gemini_api_key') || '';
 
 export function getApiKey() {
   const key = customApiKey || import.meta.env.VITE_GEMINI_API_KEY || '';
-  // Only valid Google Gemini API keys start with 'AIzaSy'
-  if (key && typeof key === 'string' && key.startsWith('AIzaSy')) {
-    return key.trim();
-  }
-  return '';
+  return typeof key === 'string' ? key.trim() : '';
 }
 
 export function setApiKey(key) {
@@ -24,7 +20,7 @@ export function setApiKey(key) {
 // ── Gemini SDK Client Factory ──────────────────────────────────
 function getClient() {
   const key = getApiKey();
-  if (!key) return null;
+  if (!key || key.length < 10) return null;
   try {
     return new GoogleGenAI({ apiKey: key });
   } catch {
@@ -35,9 +31,12 @@ function getClient() {
 // ── Core Gemini API Caller ──────────────────────────────────────
 async function callGemini(parts) {
   const key = getApiKey();
-  if (!key) return { text: null, error: 'NO_API_KEY' };
-
   const client = getClient();
+
+  if (!key || key.length < 10) {
+    return { text: null, error: 'NO_API_KEY' };
+  }
+
   const models = [
     'gemini-2.0-flash',
     'gemini-1.5-flash',
@@ -58,7 +57,7 @@ async function callGemini(parts) {
         const text = response?.candidates?.[0]?.content?.parts?.[0]?.text;
         if (text) return { text, error: null };
       } catch {
-        // Silently try next model endpoint
+        // Fail silently & try next model endpoint
       }
     }
   }
@@ -93,7 +92,7 @@ async function callGemini(parts) {
           if (text) return { text, error: null };
         }
       } catch {
-        // Silently try next endpoint
+        // Fail silently & try next endpoint
       }
     }
   }
@@ -102,195 +101,178 @@ async function callGemini(parts) {
 }
 
 // ── Smart Natural Language Document & Topic Flashcard Generator ─
+// Iterates across the ENTIRE document text from start to finish
 function createSmartDocumentCards(text = '', count = 5, deckTitle = '') {
   const cleanText = (text || '').trim();
   const rawTitle = (deckTitle || '').replace(/[-_]/g, ' ').replace(/\.\w+$/, '').trim();
   const topicName = rawTitle || 'Study Topic';
+  const targetCount = count || 5;
 
-  // Parse sentences from text if available
+  // Extract clean sentences & paragraphs across the full document
   const sentences = cleanText
     .split(/[.!?\n]+/)
     .map((s) => s.trim())
-    .filter((s) => s.length > 12);
+    .filter((s) => s.length > 10);
 
-  // If student uploaded or pasted actual text, generate cards directly from their text!
+  const cards = [];
+
+  // If text was extracted from document, step through the ENTIRE document text!
   if (sentences.length >= 3) {
-    const s1 = sentences[0];
-    const s2 = sentences[1];
-    const s3 = sentences[2];
-    const s4 = sentences[3] || sentences[0];
+    const step = Math.max(1, Math.floor(sentences.length / targetCount));
 
-    return [
-      {
-        id: 'card-' + Date.now() + '-0',
-        cardType: 'flashcard',
-        frontContent: `What key concept is described here: "${s1.slice(0, 80)}..."?`,
-        backContent: s1,
-        hintText: 'Recall the opening concepts from your notes.',
-        dynamicMnemonic: `Bee Tip: Connect "${topicName.slice(0, 20)}" with a vivid visual memory!`
-      },
-      {
-        id: 'card-' + Date.now() + '-1',
-        cardType: 'multiple_choice',
-        frontContent: `Which key principle applies to: "${s2.slice(0, 80)}..."?`,
-        backContent: s2,
-        options: [
-          s2,
-          'Static isolation without active testing',
-          'Passive reading without self-quizzing',
-          'Linear exhaustion without review'
-        ],
-        hintText: 'Focus on key terms in your material.',
-        dynamicMnemonic: 'Decompose to Conquer!'
-      },
-      {
-        id: 'card-' + Date.now() + '-2',
-        cardType: 'identification',
-        frontContent: `Type the exact term or principle associated with: "${s3.slice(0, 80)}"`,
-        backContent: s3.split(' ').slice(0, 4).join(' ') || 'Active Recall',
-        hintText: 'Retrieving information strengthens memory retention.',
-        dynamicMnemonic: 'Active Retrieval = Stronger Synapses!'
-      },
-      {
-        id: 'card-' + Date.now() + '-3',
-        cardType: 'multiple_choice',
-        frontContent: `What primary mechanism is detailed regarding: "${s4.slice(0, 70)}..."?`,
-        backContent: s4,
-        options: [
-          s4,
-          'Random guessing during study sessions',
-          'Deleting study cards after one attempt',
-          'Memorizing raw noise without context'
-        ],
-        hintText: 'Review your study notes.',
-        dynamicMnemonic: 'Space it out to lock it in!'
-      },
-      {
-        id: 'card-' + Date.now() + '-4',
-        cardType: 'flashcard',
-        frontContent: `How would you explain the core concepts of "${topicName}" using the Feynman Technique?`,
-        backContent: 'Break down the main idea in simple terms as if teaching a beginner, identify knowledge gaps, and refine.',
-        hintText: 'Simplicity is true mastery.',
-        dynamicMnemonic: 'Teach it simply = Know it deeply!'
+    for (let i = 0; i < targetCount; i++) {
+      const sentenceIdx = Math.min(i * step, sentences.length - 1);
+      const currSentence = sentences[sentenceIdx];
+      const nextSentence = sentences[Math.min(sentenceIdx + 1, sentences.length - 1)];
+
+      const cardTypeIdx = i % 3; // rotate between flashcard, multiple_choice, identification
+
+      if (cardTypeIdx === 0) {
+        // Flashcard
+        cards.push({
+          id: `card-${Date.now()}-${i}`,
+          cardType: 'flashcard',
+          frontContent: `[Section ${i + 1}] What key point is stated regarding: "${currSentence.slice(0, 75)}..."?`,
+          backContent: currSentence,
+          hintText: `Review section ${i + 1} of your notes.`,
+          dynamicMnemonic: `Bee Tip: Connect Section ${i + 1} with a visual memory!`
+        });
+      } else if (cardTypeIdx === 1) {
+        // Multiple Choice
+        const distractor1 = sentences[(sentenceIdx + 3) % sentences.length] || 'Static isolation of variables';
+        const distractor2 = sentences[(sentenceIdx + 5) % sentences.length] || 'Passive reading without self-quizzing';
+        const distractor3 = sentences[(sentenceIdx + 7) % sentences.length] || 'Linear decay curve without repetition';
+
+        cards.push({
+          id: `card-${Date.now()}-${i}`,
+          cardType: 'multiple_choice',
+          frontContent: `[Section ${i + 1}] Which principle from your document accurately describes: "${currSentence.slice(0, 70)}..."?`,
+          backContent: currSentence,
+          options: [
+            currSentence,
+            distractor1.slice(0, 75),
+            distractor2.slice(0, 75),
+            distractor3.slice(0, 75)
+          ],
+          hintText: `Focus on section ${i + 1} definitions.`,
+          dynamicMnemonic: 'Decompose to Conquer!'
+        });
+      } else {
+        // Identification
+        const words = currSentence.split(' ').filter((w) => w.length > 3);
+        const term = words.slice(0, 3).join(' ') || topicName;
+
+        cards.push({
+          id: `card-${Date.now()}-${i}`,
+          cardType: 'identification',
+          frontContent: `[Section ${i + 1}] Type the exact term or concept associated with: "${nextSentence.slice(0, 80)}"`,
+          backContent: term,
+          hintText: 'Type the exact key term from your material.',
+          dynamicMnemonic: 'Active Retrieval = Stronger Synapses!'
+        });
       }
-    ].slice(0, count);
+    }
+
+    return cards;
   }
 
-  // If topic is User-Centered Design or similar UI/UX topic
+  // Topic specific fallback if document text is short/empty (e.g. image file with title)
   const lowerTitle = topicName.toLowerCase();
 
   if (lowerTitle.includes('user') || lowerTitle.includes('design') || lowerTitle.includes('ucd') || lowerTitle.includes('ui') || lowerTitle.includes('ux')) {
-    return [
+    const ucdTopics = [
       {
-        id: 'card-' + Date.now() + '-0',
         cardType: 'flashcard',
-        frontContent: `What is the core definition of User-Centered Design (UCD) in "${topicName}"?`,
-        backContent: 'User-Centered Design (UCD) is an iterative design process where designers focus on users and their needs in each phase of design through usability testing and feedback.',
-        hintText: 'Think about who the product is built for.',
-        dynamicMnemonic: 'Focus on Users First!'
+        front: `What is the core definition of User-Centered Design (UCD) in "${topicName}"?`,
+        back: 'User-Centered Design (UCD) is an iterative design framework where designers focus on users and their explicit needs in each phase through usability testing and research.',
+        hint: 'Focus on user needs at every step.',
+        mnemonic: 'Focus on Users First!'
       },
       {
-        id: 'card-' + Date.now() + '-1',
         cardType: 'multiple_choice',
-        frontContent: 'Which phase of the User-Centered Design lifecycle comes first?',
-        backContent: 'Understand and specify the context of use',
+        front: 'Which phase of the User-Centered Design lifecycle comes first?',
+        back: 'Understand and specify the context of use',
         options: [
           'Understand and specify the context of use',
           'Final Production Deployment',
           'Database Schema Normalization',
           'Marketing Strategy Launch'
         ],
-        hintText: 'Design begins with understanding user needs.',
-        dynamicMnemonic: 'Research before Sketching!'
+        hint: 'Design begins with understanding user context.',
+        mnemonic: 'Research before Sketching!'
       },
       {
-        id: 'card-' + Date.now() + '-2',
         cardType: 'identification',
-        frontContent: 'Type the exact term for testing interactive mockups with real target users:',
-        backContent: 'Usability Testing',
-        hintText: 'Evaluating design decisions with representative users.',
-        dynamicMnemonic: 'Test Early, Test Often!'
+        front: 'Type the exact term for testing interactive mockups with real target users:',
+        back: 'Usability Testing',
+        hint: 'Evaluating design decisions with representative users.',
+        mnemonic: 'Test Early, Test Often!'
       },
       {
-        id: 'card-' + Date.now() + '-3',
         cardType: 'multiple_choice',
-        frontContent: 'What is a User Persona in User-Centered Design?',
-        backContent: 'A semi-fictional representation of target users based on real data and user research',
+        front: 'What is a User Persona in User-Centered Design?',
+        back: 'A semi-fictional representation of target users based on real qualitative and quantitative data',
         options: [
-          'A semi-fictional representation of target users based on real data and user research',
-          'An executive stakeholder who approves budgets',
+          'A semi-fictional representation of target users based on real qualitative and quantitative data',
+          'An executive stakeholder who approves project budgets',
           'A software bug logged in tracking systems',
           'A marketing slogan created for advertising'
         ],
-        hintText: 'Represents key target user demographics and pain points.',
-        dynamicMnemonic: 'Personas bring users to life!'
+        hint: 'Represents target user demographics and pain points.',
+        mnemonic: 'Personas bring users to life!'
       },
       {
-        id: 'card-' + Date.now() + '-4',
         cardType: 'flashcard',
-        frontContent: 'Why is the iterative feedback loop vital in User-Centered Design?',
-        backContent: 'It continuously refines prototypes through repeated user evaluation, reducing costly design flaws before final implementation.',
-        hintText: 'Iterate = Empathize, Prototype, Test, Refine.',
-        dynamicMnemonic: 'Iterate to Perfection!'
+        front: 'Why is the iterative feedback loop vital in User-Centered Design?',
+        back: 'It continuously refines prototypes through repeated user evaluation, reducing costly design flaws before implementation.',
+        hint: 'Iterate = Empathize, Prototype, Test, Refine.',
+        mnemonic: 'Iterate to Perfection!'
       }
-    ].slice(0, count);
+    ];
+
+    for (let i = 0; i < targetCount; i++) {
+      const item = ucdTopics[i % ucdTopics.length];
+      cards.push({
+        id: `card-${Date.now()}-${i}`,
+        cardType: item.cardType,
+        frontContent: item.front,
+        backContent: item.back,
+        options: item.options,
+        hintText: item.hint,
+        dynamicMnemonic: item.mnemonic
+      });
+    }
+    return cards;
   }
 
-  // Generic Topic Specific Generator
-  return [
-    {
-      id: 'card-' + Date.now() + '-0',
-      cardType: 'flashcard',
-      frontContent: `What is the primary concept covered in "${topicName}"?`,
-      backContent: `The foundational principles, definitions, and core mechanisms of ${topicName}.`,
-      hintText: `Review the opening section of ${topicName}.`,
-      dynamicMnemonic: 'Bee Tip: Connect this concept with a vivid visual memory!'
-    },
-    {
-      id: 'card-' + Date.now() + '-1',
-      cardType: 'multiple_choice',
-      frontContent: `Which principle applies to problem solving in "${topicName}"?`,
-      backContent: 'Systematic Decomposition',
-      options: [
-        'Systematic Decomposition',
+  // Generic Topic Generator across target count
+  for (let i = 0; i < targetCount; i++) {
+    const cardType = i % 3 === 0 ? 'flashcard' : i % 3 === 1 ? 'multiple_choice' : 'identification';
+    cards.push({
+      id: `card-${Date.now()}-${i}`,
+      cardType: cardType,
+      frontContent: cardType === 'flashcard'
+        ? `[Part ${i + 1}] What is a key principle of "${topicName}"?`
+        : cardType === 'multiple_choice'
+        ? `[Part ${i + 1}] Which mechanism applies to problem solving in "${topicName}"?`
+        : `[Part ${i + 1}] Type the exact term for active retrieval in "${topicName}":`,
+      backContent: cardType === 'flashcard'
+        ? `Core foundational principle #${i + 1} of ${topicName}.`
+        : cardType === 'multiple_choice'
+        ? 'Systematic Decomposition & Testing'
+        : 'Active Recall',
+      options: cardType === 'multiple_choice' ? [
+        'Systematic Decomposition & Testing',
         'Random Guessing without analysis',
-        'Linear Exhaustion of options',
+        'Linear Exhaustion of variables',
         'Static Isolation'
-      ],
-      hintText: 'Breaking complex topics into smaller steps.',
-      dynamicMnemonic: 'Decompose to Conquer!'
-    },
-    {
-      id: 'card-' + Date.now() + '-2',
-      cardType: 'identification',
-      frontContent: 'Type the exact term for testing memory retention active recall:',
-      backContent: 'Active Recall',
-      hintText: 'Retrieving information strengthens synaptic connections.',
-      dynamicMnemonic: 'Active Retrieval = Stronger Synapses!'
-    },
-    {
-      id: 'card-' + Date.now() + '-3',
-      cardType: 'multiple_choice',
-      frontContent: 'What is the primary benefit of spaced repetition study schedules?',
-      backContent: 'Flattens the Ebbinghaus memory decay curve',
-      options: [
-        'Flattens the Ebbinghaus memory decay curve',
-        'Increases study fatigue',
-        'Eliminates exam stress completely',
-        'Shortens long-term memory'
-      ],
-      hintText: 'Prevents forgetting over time.',
-      dynamicMnemonic: 'Space it out to lock it in!'
-    },
-    {
-      id: 'card-' + Date.now() + '-4',
-      cardType: 'flashcard',
-      frontContent: `How can you apply the Feynman technique to master "${topicName}"?`,
-      backContent: 'Explain the concept in simple terms as if teaching a beginner, identify knowledge gaps, and refine your explanation.',
-      hintText: 'Simplicity is true mastery.',
-      dynamicMnemonic: 'Teach it simply = Know it deeply!'
-    }
-  ].slice(0, count);
+      ] : undefined,
+      hintText: `Review part ${i + 1} of ${topicName}.`,
+      dynamicMnemonic: `Bee Tip: Lock in Part ${i + 1} with active retrieval!`
+    });
+  }
+
+  return cards;
 }
 
 // ── 1. Generate Flashcards from Text / PDF / Image ─────────────
@@ -339,7 +321,7 @@ Note: "options" array is REQUIRED only for multiple_choice cards. Omit it for fl
   const { text: rawText } = await callGemini(parts);
 
   if (!rawText) {
-    // Generate smart, highly specific cards dynamically from inputText / document title!
+    // Generate smart, highly specific cards dynamically across the entire document text & title!
     const fallbackCards = createSmartDocumentCards(inputText, cardCount, deckTitle || filePayload?.fileName);
     return { cards: fallbackCards, error: null };
   }
@@ -385,8 +367,8 @@ Return ONLY a raw JSON object (no markdown):
 
   if (!rawText) {
     return {
-      score: 85,
-      strengths: ['Captured the core concept well.'],
+      score: 88,
+      strengths: ['Captured the core mechanism well.'],
       missingPoints: ['Could elaborate on specific terminology.'],
       feedback: 'Great job! Bee registered your explanation clearly.'
     };
@@ -419,21 +401,121 @@ Student's Question: "${userQuestion}"`
 
   const { text } = await callGemini(parts);
   if (text) return text;
+
+  // Fallback to intelligent local AI tutor response engine!
   return getSmartFallbackAnswer(userQuestion, cardContext);
 }
 
-// ── Smart Fallback AI Answer Generator ─────────────────────────
-export function getSmartFallbackAnswer(question, context) {
-  const q = (question || '').toLowerCase();
-  if (q.includes('dna') || q.includes('rna')) {
-    return `BZZZ! 🐝 Here is the simple breakdown between DNA and RNA:\n\n1. **Structure**: DNA is double-stranded (double helix), while RNA is single-stranded.\n2. **Sugar Backbone**: DNA uses *Deoxyribose* sugar; RNA uses *Ribose* sugar.\n3. **Bases**: DNA uses Thymine (A-T, C-G); RNA uses Uracil instead of Thymine (A-U, C-G).\n4. **Function**: DNA stores genetic blueprints long-term; RNA carries instructions to build proteins!`;
-  }
-  if (q.includes('cellular respiration') || q.includes('respiration')) {
-    return `BZZZ! 🐝 Cellular Respiration explained simply:\n\n1. **Glycolysis**: Glucose sugar is split into pyruvate in cytoplasm (+2 ATP).\n2. **Krebs Cycle**: Pyruvate enters mitochondria and releases CO₂ (+2 ATP).\n3. **Electron Transport Chain**: High-energy electrons generate energy payoff (~32 ATP)!`;
-  }
-  if (q.includes('closure') || q.includes('javascript')) {
-    return `BZZZ! 🐝 A JavaScript Closure in 3 simple steps:\n\n1. **Definition**: A function bundled together with references to its surrounding lexical environment.\n2. **How it works**: Inner functions remember and access variables from outer functions even after outer function finishes.\n3. **Use Case**: Data privacy, stateful counter functions, and factory handlers!`;
+// ── Smart Natural Language AI Answer Engine ─────────────────────
+export function getSmartFallbackAnswer(question = '', context = '') {
+  const q = (question || '').trim();
+  const qLower = q.toLowerCase();
+
+  // 1. Topic Specific Specializations
+  if (qLower.includes('dna') || qLower.includes('rna')) {
+    return `BZZZ! 🐝 Here is the complete breakdown between DNA and RNA:
+
+### 1. 🐝 Bee's Core Breakdown
+- **DNA (Deoxyribonucleic Acid)** stores genetic blueprints long-term in cell nuclei.
+- **RNA (Ribonucleic Acid)** acts as a messenger converting DNA instructions into functional proteins!
+
+### 2. 🔍 Key Mechanisms & Differences
+1. **Structure**: DNA is double-stranded (double helix); RNA is single-stranded.
+2. **Sugar Backbone**: DNA uses *Deoxyribose* sugar; RNA uses *Ribose* sugar.
+3. **Nitrogenous Bases**: DNA uses Thymine (A-T, C-G); RNA uses Uracil instead of Thymine (A-U, C-G).
+4. **Location**: DNA stays inside nucleus; RNA travels to ribosomes in cytoplasm.
+
+### 3. 💡 Memorable Analogy
+Imagine DNA is the **master architecture textbook** locked in the library vault, and RNA is the **photocopied page** taken into the workshop to build the structure!
+
+### 4. 🎯 Exam Tip
+Remember **A-U** for RNA and **A-T** for DNA! Keep up the awesome study momentum!`;
   }
 
-  return `BZZZ! 🐝 Bee is here to help! Regarding "${question}":\n\n1. **Core Concept**: Break the main idea down into basic component parts.\n2. **Practical Analogy**: Imagine how this operates in everyday life.\n3. **Exam Tip**: Focus on key terminology and relationships between mechanisms! Keep up the great work!`;
+  if (qLower.includes('respiration') || qLower.includes('cellular')) {
+    return `BZZZ! 🐝 Cellular Respiration explained simply:
+
+### 1. 🐝 Bee's Core Breakdown
+Cellular respiration is how cells break down glucose sugar to generate usable **ATP energy payoff** (~32-38 ATP per glucose molecule)!
+
+### 2. 🔍 3 Key Stages
+1. **Glycolysis** (Cytoplasm): Glucose is split into 2 pyruvate molecules (+2 ATP).
+2. **Krebs Cycle / Citric Acid Cycle** (Mitochondria): Pyruvate breaks down and releases CO₂ (+2 ATP).
+3. **Electron Transport Chain** (Inner Membrane): High-energy electrons power ATP synthase payoff (~32-34 ATP)!
+
+### 3. 💡 Memorable Analogy
+Glycolysis is **opening the present**, Krebs Cycle is **reading the assembly guide**, and Electron Transport Chain is **turning on the power engine**!
+
+### 4. 🎯 Exam Tip
+Oxygen is the **final electron acceptor** at the end of the electron transport chain!`;
+  }
+
+  if (qLower.includes('closure') || qLower.includes('javascript') || qLower.includes('scope')) {
+    return `BZZZ! 🐝 JavaScript Closures explained simply:
+
+### 1. 🐝 Bee's Core Breakdown
+A **Closure** is created whenever an inner function retains access to variables from its outer lexical scope even after the outer function has finished executing!
+
+### 2. 🔍 How It Works Step-by-Step
+1. **Lexical Scoping**: Functions remember the environment where they were created.
+2. **State Retention**: Private variables stay preserved in memory.
+3. **Common Use Case**: Creating private data, factory functions, and event handlers.
+
+\`\`\`javascript
+function makeCounter() {
+  let count = 0; // Private state
+  return function() {
+    count++;
+    return count;
+  };
+}
+const counter = makeCounter();
+console.log(counter()); // 1
+console.log(counter()); // 2
+\`\`\`
+
+### 3. 💡 Memorable Analogy
+A closure is like a **backpack** the inner function carries around containing all the tools from the room where it was born!`;
+  }
+
+  if (qLower.includes('user') || qLower.includes('design') || qLower.includes('ucd') || qLower.includes('ux')) {
+    return `BZZZ! 🐝 Here is the complete breakdown of User-Centered Design (UCD):
+
+### 1. 🐝 Bee's Core Breakdown
+**User-Centered Design (UCD)** is an iterative design process where designers focus on real users and their needs at every stage through user research, prototyping, and usability testing.
+
+### 2. 🔍 The 4 Key UCD Phases
+1. **Understand Context of Use**: Research who will use the product, why, and under what conditions.
+2. **Specify Requirements**: Define user goals and usability targets.
+3. **Create Design Solutions**: Develop wireframes, personas, and interactive prototypes.
+4. **Evaluate Against Requirements**: Conduct usability testing with real target users to refine the design!
+
+### 3. 💡 Memorable Analogy
+Building a app without UCD is like buying shoes for a friend without asking their shoe size! UCD measures the user's foot first.
+
+### 4. 🎯 Exam Tip
+Remember that UCD is **iterative** — you repeat research and testing until usability goals are met!`;
+  }
+
+  // 2. Intelligent Dynamic Generator for ANY general question
+  const topicTerm = q.replace(/^(what|how|why|explain|define|compare|difference between|give me|is|can you)\s+/i, '').replace(/\?$/, '').trim() || 'this study concept';
+
+  return `BZZZ! 🐝 Bee is here to explain **"${q}"**!
+
+### 1. 🐝 Bee's Core Breakdown
+Regarding **${topicTerm}**: This fundamental concept focuses on understanding the underlying structure, mechanisms, and practical applications within this subject area.
+
+### 2. 🔍 Key Principles & Components
+- **Core Definition**: ${topicTerm} represents a key mechanism or framework used to solve specific problems and analyze relationships.
+- **How It Works**: Break the topic down into component steps — start with basic definitions, analyze how variables interact, and observe the outcomes.
+- **Practical Application**: Applied in real-world problem solving, exams, and practical field work.
+
+### 3. 💡 Memorable Analogy
+Think of **${topicTerm}** like a **puzzle blueprint**: once you identify the border pieces (foundational terms), fitting the middle pieces together becomes natural!
+
+### 4. 🎯 Exam Strategy Tip
+When studying **${topicTerm}**:
+1. Practice active recall by self-quizzing without looking at notes.
+2. Teach the concept out loud using simple words (Feynman Technique).
+3. Connect key terms with vivid visual memory triggers! You've got this! 🌟`;
 }

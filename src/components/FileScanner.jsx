@@ -70,19 +70,53 @@ export default function FileScanner({ onDeckCreated }) {
     readerBase64.onload = (evt) => {
       setFilePayload({
         base64Data: evt.target?.result || '',
-        mimeType: file.type || (file.name.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg')
+        mimeType: file.type || (file.name.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'),
+        fileName: file.name
       });
     };
     readerBase64.readAsDataURL(file);
 
-    // Also attempt text read if text file
-    if (file.type.includes('text') || file.name.endsWith('.txt') || file.name.endsWith('.md')) {
+    // Read text content for text/code/markdown files
+    if (file.type.includes('text') || file.name.match(/\.(txt|md|json|csv|js|jsx|ts|tsx|html|css)$/i)) {
       const readerText = new FileReader();
       readerText.onload = (evt) => {
         setInputText(evt.target?.result || '');
       };
       readerText.readAsText(file);
+    } else {
+      // Extract printable text from binary files (PDF/DOC)
+      const readerBinary = new FileReader();
+      readerBinary.onload = (evt) => {
+        const buffer = evt.target?.result;
+        if (buffer) {
+          const bytes = new Uint8Array(buffer);
+          let str = '';
+          for (let i = 0; i < bytes.length; i++) {
+            const code = bytes[i];
+            if ((code >= 32 && code <= 126) || code === 10 || code === 13 || code === 9) {
+              str += String.fromCharCode(code);
+            } else {
+              str += ' ';
+            }
+          }
+          const clean = str.replace(/\s+/g, ' ').trim();
+          if (clean.length > 50) {
+            setInputText(clean);
+          }
+        }
+      };
+      readerBinary.readAsArrayBuffer(file);
     }
+  };
+
+  const calculateCardCount = (text = '') => {
+    const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
+    if (wordCount < 40) return 5;
+    if (wordCount < 150) return 6;
+    if (wordCount < 400) return 8;
+    if (wordCount < 1000) return 12;
+    if (wordCount < 2000) return 16;
+    return 20; // Up to 20 cards for large documents
   };
 
   const handleSaveApiKey = () => {
@@ -100,8 +134,10 @@ export default function FileScanner({ onDeckCreated }) {
     setGeneratedCards([]);
     setScanError(null);
 
+    const targetCount = calculateCardCount(inputText);
+
     try {
-      const result = await generateFlashcardsFromText(inputText, 5, filePayload, deckTitle || extractedFileMeta?.name);
+      const result = await generateFlashcardsFromText(inputText, targetCount, filePayload, deckTitle || extractedFileMeta?.name);
       const { cards, error } = result || {};
 
       if (error) {
