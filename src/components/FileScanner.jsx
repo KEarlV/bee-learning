@@ -101,7 +101,7 @@ export default function FileScanner({ onDeckCreated }) {
     setScanError(null);
 
     try {
-      const result = await generateFlashcardsFromText(inputText, 5, filePayload);
+      const result = await generateFlashcardsFromText(inputText, 5, filePayload, deckTitle || extractedFileMeta?.name);
       const { cards, error } = result || {};
 
       if (error) {

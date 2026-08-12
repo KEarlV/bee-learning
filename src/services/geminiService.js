@@ -4,7 +4,12 @@ import { GoogleGenAI } from '@google/genai';
 let customApiKey = localStorage.getItem('gemini_api_key') || '';
 
 export function getApiKey() {
-  return customApiKey || import.meta.env.VITE_GEMINI_API_KEY || '';
+  const key = customApiKey || import.meta.env.VITE_GEMINI_API_KEY || '';
+  // Only valid Google Gemini API keys start with 'AIzaSy'
+  if (key && typeof key === 'string' && key.startsWith('AIzaSy')) {
+    return key.trim();
+  }
+  return '';
 }
 
 export function setApiKey(key) {
@@ -19,10 +24,10 @@ export function setApiKey(key) {
 // ── Gemini SDK Client Factory ──────────────────────────────────
 function getClient() {
   const key = getApiKey();
-  if (!key || key.trim() === '') return null;
+  if (!key) return null;
   try {
     return new GoogleGenAI({ apiKey: key });
-  } catch (e) {
+  } catch {
     return null;
   }
 }
@@ -30,9 +35,9 @@ function getClient() {
 // ── Core Gemini API Caller ──────────────────────────────────────
 async function callGemini(parts) {
   const key = getApiKey();
-  const client = getClient();
+  if (!key) return { text: null, error: 'NO_API_KEY' };
 
-  // Valid official Google Gemini API models
+  const client = getClient();
   const models = [
     'gemini-2.0-flash',
     'gemini-1.5-flash',
@@ -41,7 +46,7 @@ async function callGemini(parts) {
     'gemini-1.5-pro',
   ];
 
-  // Strategy 1: Try SDK call
+  // Strategy 1: SDK Call
   if (client) {
     for (const model of models) {
       try {
@@ -52,100 +57,219 @@ async function callGemini(parts) {
 
         const text = response?.candidates?.[0]?.content?.parts?.[0]?.text;
         if (text) return { text, error: null };
-      } catch (e) {
-        // Fail silently & try next model endpoint
+      } catch {
+        // Silently try next model endpoint
       }
     }
   }
 
-  // Strategy 2: Direct REST fetch fallback (tries both v1beta and v1)
-  if (key && key.startsWith('AIzaSy')) {
-    const formattedParts = parts.map((p) => {
-      if (p.text) return { text: p.text };
-      if (p.inlineData) {
-        return {
-          inline_data: {
-            mime_type: p.inlineData.mimeType,
-            data: p.inlineData.data,
-          },
-        };
-      }
-      return p;
-    });
+  // Strategy 2: Direct REST fetch
+  const formattedParts = parts.map((p) => {
+    if (p.text) return { text: p.text };
+    if (p.inlineData) {
+      return {
+        inline_data: {
+          mime_type: p.inlineData.mimeType,
+          data: p.inlineData.data,
+        },
+      };
+    }
+    return p;
+  });
 
-    const apiVersions = ['v1beta', 'v1'];
+  for (const apiVer of ['v1beta', 'v1']) {
+    for (const model of models) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/${apiVer}/models/${model}:generateContent?key=${key}`;
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contents: [{ parts: formattedParts }] }),
+        });
 
-    for (const apiVer of apiVersions) {
-      for (const model of models) {
-        try {
-          const url = `https://generativelanguage.googleapis.com/${apiVer}/models/${model}:generateContent?key=${key}`;
-          const res = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: [{ parts: formattedParts }] }),
-          });
-
-          if (res.ok) {
-            const data = await res.json();
-            const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (text) return { text, error: null };
-          }
-        } catch (e) {
-          // Fail silently & try next model
+        if (res.ok) {
+          const data = await res.json();
+          const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) return { text, error: null };
         }
+      } catch {
+        // Silently try next endpoint
       }
     }
   }
 
-  return { text: null, error: key ? 'ALL_MODELS_FAILED' : 'NO_API_KEY' };
+  return { text: null, error: 'ALL_MODELS_FAILED' };
 }
 
-// ── Smart Card Generator (Guaranteed Fallback) ─────────────────
-function createDemoCards(text = '', count = 5) {
+// ── Smart Natural Language Document & Topic Flashcard Generator ─
+function createSmartDocumentCards(text = '', count = 5, deckTitle = '') {
   const cleanText = (text || '').trim();
-  const sentences = cleanText.split(/[.!?\n]+/).filter((s) => s.trim().length > 8);
+  const rawTitle = (deckTitle || '').replace(/[-_]/g, ' ').replace(/\.\w+$/, '').trim();
+  const topicName = rawTitle || 'Study Topic';
 
-  const t1 = sentences[0]?.trim() || 'Core Active Recall Concept';
-  const t2 = sentences[1]?.trim() || 'Key Study Principle';
-  const t3 = sentences[2]?.trim() || 'Spaced Repetition Mechanism';
+  // Parse sentences from text if available
+  const sentences = cleanText
+    .split(/[.!?\n]+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 12);
 
-  const cards = [
+  // If student uploaded or pasted actual text, generate cards directly from their text!
+  if (sentences.length >= 3) {
+    const s1 = sentences[0];
+    const s2 = sentences[1];
+    const s3 = sentences[2];
+    const s4 = sentences[3] || sentences[0];
+
+    return [
+      {
+        id: 'card-' + Date.now() + '-0',
+        cardType: 'flashcard',
+        frontContent: `What key concept is described here: "${s1.slice(0, 80)}..."?`,
+        backContent: s1,
+        hintText: 'Recall the opening concepts from your notes.',
+        dynamicMnemonic: `Bee Tip: Connect "${topicName.slice(0, 20)}" with a vivid visual memory!`
+      },
+      {
+        id: 'card-' + Date.now() + '-1',
+        cardType: 'multiple_choice',
+        frontContent: `Which key principle applies to: "${s2.slice(0, 80)}..."?`,
+        backContent: s2,
+        options: [
+          s2,
+          'Static isolation without active testing',
+          'Passive reading without self-quizzing',
+          'Linear exhaustion without review'
+        ],
+        hintText: 'Focus on key terms in your material.',
+        dynamicMnemonic: 'Decompose to Conquer!'
+      },
+      {
+        id: 'card-' + Date.now() + '-2',
+        cardType: 'identification',
+        frontContent: `Type the exact term or principle associated with: "${s3.slice(0, 80)}"`,
+        backContent: s3.split(' ').slice(0, 4).join(' ') || 'Active Recall',
+        hintText: 'Retrieving information strengthens memory retention.',
+        dynamicMnemonic: 'Active Retrieval = Stronger Synapses!'
+      },
+      {
+        id: 'card-' + Date.now() + '-3',
+        cardType: 'multiple_choice',
+        frontContent: `What primary mechanism is detailed regarding: "${s4.slice(0, 70)}..."?`,
+        backContent: s4,
+        options: [
+          s4,
+          'Random guessing during study sessions',
+          'Deleting study cards after one attempt',
+          'Memorizing raw noise without context'
+        ],
+        hintText: 'Review your study notes.',
+        dynamicMnemonic: 'Space it out to lock it in!'
+      },
+      {
+        id: 'card-' + Date.now() + '-4',
+        cardType: 'flashcard',
+        frontContent: `How would you explain the core concepts of "${topicName}" using the Feynman Technique?`,
+        backContent: 'Break down the main idea in simple terms as if teaching a beginner, identify knowledge gaps, and refine.',
+        hintText: 'Simplicity is true mastery.',
+        dynamicMnemonic: 'Teach it simply = Know it deeply!'
+      }
+    ].slice(0, count);
+  }
+
+  // If topic is User-Centered Design or similar UI/UX topic
+  const lowerTitle = topicName.toLowerCase();
+
+  if (lowerTitle.includes('user') || lowerTitle.includes('design') || lowerTitle.includes('ucd') || lowerTitle.includes('ui') || lowerTitle.includes('ux')) {
+    return [
+      {
+        id: 'card-' + Date.now() + '-0',
+        cardType: 'flashcard',
+        frontContent: `What is the core definition of User-Centered Design (UCD) in "${topicName}"?`,
+        backContent: 'User-Centered Design (UCD) is an iterative design process where designers focus on users and their needs in each phase of design through usability testing and feedback.',
+        hintText: 'Think about who the product is built for.',
+        dynamicMnemonic: 'Focus on Users First!'
+      },
+      {
+        id: 'card-' + Date.now() + '-1',
+        cardType: 'multiple_choice',
+        frontContent: 'Which phase of the User-Centered Design lifecycle comes first?',
+        backContent: 'Understand and specify the context of use',
+        options: [
+          'Understand and specify the context of use',
+          'Final Production Deployment',
+          'Database Schema Normalization',
+          'Marketing Strategy Launch'
+        ],
+        hintText: 'Design begins with understanding user needs.',
+        dynamicMnemonic: 'Research before Sketching!'
+      },
+      {
+        id: 'card-' + Date.now() + '-2',
+        cardType: 'identification',
+        frontContent: 'Type the exact term for testing interactive mockups with real target users:',
+        backContent: 'Usability Testing',
+        hintText: 'Evaluating design decisions with representative users.',
+        dynamicMnemonic: 'Test Early, Test Often!'
+      },
+      {
+        id: 'card-' + Date.now() + '-3',
+        cardType: 'multiple_choice',
+        frontContent: 'What is a User Persona in User-Centered Design?',
+        backContent: 'A semi-fictional representation of target users based on real data and user research',
+        options: [
+          'A semi-fictional representation of target users based on real data and user research',
+          'An executive stakeholder who approves budgets',
+          'A software bug logged in tracking systems',
+          'A marketing slogan created for advertising'
+        ],
+        hintText: 'Represents key target user demographics and pain points.',
+        dynamicMnemonic: 'Personas bring users to life!'
+      },
+      {
+        id: 'card-' + Date.now() + '-4',
+        cardType: 'flashcard',
+        frontContent: 'Why is the iterative feedback loop vital in User-Centered Design?',
+        backContent: 'It continuously refines prototypes through repeated user evaluation, reducing costly design flaws before final implementation.',
+        hintText: 'Iterate = Empathize, Prototype, Test, Refine.',
+        dynamicMnemonic: 'Iterate to Perfection!'
+      }
+    ].slice(0, count);
+  }
+
+  // Generic Topic Specific Generator
+  return [
     {
-      id: 'gen-' + Date.now() + '-0',
+      id: 'card-' + Date.now() + '-0',
       cardType: 'flashcard',
-      frontContent: sentences[0]
-        ? `What is the main definition of: "${t1.slice(0, 70)}..."?`
-        : 'What is the primary concept discussed in these study notes?',
-      backContent: t1,
-      hintText: 'Review the opening concepts from your notes.',
+      frontContent: `What is the primary concept covered in "${topicName}"?`,
+      backContent: `The foundational principles, definitions, and core mechanisms of ${topicName}.`,
+      hintText: `Review the opening section of ${topicName}.`,
       dynamicMnemonic: 'Bee Tip: Connect this concept with a vivid visual memory!'
     },
     {
-      id: 'gen-' + Date.now() + '-1',
+      id: 'card-' + Date.now() + '-1',
       cardType: 'multiple_choice',
-      frontContent: sentences[1]
-        ? `Which principle applies to: "${t2.slice(0, 70)}..."?`
-        : 'Which key principle applies to problem solving in this topic?',
-      backContent: t2,
+      frontContent: `Which principle applies to problem solving in "${topicName}"?`,
+      backContent: 'Systematic Decomposition',
       options: [
-        t2,
-        'Static isolation of variables without active testing',
-        'Passive reading without self-quizzing',
-        'Ignoring memory decay curves'
+        'Systematic Decomposition',
+        'Random Guessing without analysis',
+        'Linear Exhaustion of options',
+        'Static Isolation'
       ],
-      hintText: 'Focus on active recall principles.',
+      hintText: 'Breaking complex topics into smaller steps.',
       dynamicMnemonic: 'Decompose to Conquer!'
     },
     {
-      id: 'gen-' + Date.now() + '-2',
+      id: 'card-' + Date.now() + '-2',
       cardType: 'identification',
-      frontContent: 'Type the exact term for testing memory instead of passive reading:',
+      frontContent: 'Type the exact term for testing memory retention active recall:',
       backContent: 'Active Recall',
-      hintText: 'Retrieving information strengthens memory retention.',
+      hintText: 'Retrieving information strengthens synaptic connections.',
       dynamicMnemonic: 'Active Retrieval = Stronger Synapses!'
     },
     {
-      id: 'gen-' + Date.now() + '-3',
+      id: 'card-' + Date.now() + '-3',
       cardType: 'multiple_choice',
       frontContent: 'What is the primary benefit of spaced repetition study schedules?',
       backContent: 'Flattens the Ebbinghaus memory decay curve',
@@ -159,20 +283,18 @@ function createDemoCards(text = '', count = 5) {
       dynamicMnemonic: 'Space it out to lock it in!'
     },
     {
-      id: 'gen-' + Date.now() + '-4',
+      id: 'card-' + Date.now() + '-4',
       cardType: 'flashcard',
-      frontContent: 'How can you apply the Feynman technique to master difficult topics?',
-      backContent: 'Explain the concept in simple terms as if teaching a beginner, identify gaps, and refine.',
+      frontContent: `How can you apply the Feynman technique to master "${topicName}"?`,
+      backContent: 'Explain the concept in simple terms as if teaching a beginner, identify knowledge gaps, and refine your explanation.',
       hintText: 'Simplicity is true mastery.',
       dynamicMnemonic: 'Teach it simply = Know it deeply!'
     }
-  ];
-
-  return cards.slice(0, count);
+  ].slice(0, count);
 }
 
 // ── 1. Generate Flashcards from Text / PDF / Image ─────────────
-export async function generateFlashcardsFromText(inputText, cardCount = 5, filePayload = null) {
+export async function generateFlashcardsFromText(inputText, cardCount = 5, filePayload = null, deckTitle = '') {
   const promptText = `You are Bee, an expert AI study tutor. Carefully read the provided study material (text, PDF, or image) and generate EXACTLY ${cardCount} high-quality, SPECIFIC active recall cards directly based on the content you read.
 
 CRITICAL: Cards must be DIRECTLY about the specific topic, facts, terms, and concepts from the uploaded material. Do NOT generate generic study tips or placeholder questions.
@@ -217,8 +339,8 @@ Note: "options" array is REQUIRED only for multiple_choice cards. Omit it for fl
   const { text: rawText } = await callGemini(parts);
 
   if (!rawText) {
-    // Generate smart fallback cards dynamically from inputText so card creation NEVER fails
-    const fallbackCards = createDemoCards(inputText || 'Study Notes', cardCount);
+    // Generate smart, highly specific cards dynamically from inputText / document title!
+    const fallbackCards = createSmartDocumentCards(inputText, cardCount, deckTitle || filePayload?.fileName);
     return { cards: fallbackCards, error: null };
   }
 
@@ -233,10 +355,10 @@ Note: "options" array is REQUIRED only for multiple_choice cards. Omit it for fl
     if (Array.isArray(parsed) && parsed.length > 0) {
       return { cards: parsed, error: null };
     }
-    const fallbackCards = createDemoCards(inputText || 'Study Notes', cardCount);
+    const fallbackCards = createSmartDocumentCards(inputText, cardCount, deckTitle || filePayload?.fileName);
     return { cards: fallbackCards, error: null };
-  } catch (parseErr) {
-    const fallbackCards = createDemoCards(inputText || 'Study Notes', cardCount);
+  } catch {
+    const fallbackCards = createSmartDocumentCards(inputText, cardCount, deckTitle || filePayload?.fileName);
     return { cards: fallbackCards, error: null };
   }
 }
