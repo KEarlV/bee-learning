@@ -7,9 +7,11 @@ import {
 import BeeAnimatedMascot from './BeeAnimatedMascot';
 import { getAdminSupabaseClient } from '../services/supabaseService';
 import { logActivity } from '../services/activityLogService';
+import ConfirmModal from './ConfirmModal';
 
 export default function AdminPanel({ onLogout }) {
   const [activeSection, setActiveSection] = useState('overview');
+  const [userToDelete, setUserToDelete] = useState(null);
 
   // ── Overview stats ───────────────────────────────────────────
   const [stats, setStats] = useState({ total: 0, pending: 0, approved: 0 });
@@ -217,13 +219,19 @@ export default function AdminPanel({ onLogout }) {
     );
   };
 
-  const handleDeleteUser = async (userId, username) => {
-    if (!supabase) return;
-    if (!window.confirm(`Are you sure you want to delete user "${username || userId}"? This action cannot be undone.`)) return;
+  const handleDeleteUser = (userId, username) => {
+    setUserToDelete({ id: userId, username: username || userId });
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!supabase || !userToDelete) return;
+    const { id: userId, username } = userToDelete;
     await supabase.from('user_stats').delete().eq('user_id', userId);
     setAllUsers((prev) => prev.filter((u) => u.user_id !== userId));
     setPendingUsers((prev) => prev.filter((u) => u.user_id !== userId));
+    logActivity('User Deleted', 'Admin', { userId, username });
     fetchStats();
+    setUserToDelete(null);
   };
 
   const filteredUsers = allUsers.filter((u) => {
@@ -555,7 +563,7 @@ export default function AdminPanel({ onLogout }) {
                             </span>
                           </div>
                           <span className="text-[10px] text-slate-400 block font-medium">
-                            🔥 {(!user.current_streak || user.current_streak === 5 || (user.total_xp ?? 0) < 200) ? 1 : user.current_streak}d streak · {user.cards_mastered || 0} mastered
+                            🔥 {user.current_streak ?? 1}d streak · {user.cards_mastered || 0} mastered
                           </span>
                         </td>
                         <td className="p-3">
@@ -671,7 +679,7 @@ export default function AdminPanel({ onLogout }) {
                           }`}>{user.account_status}</span>
                         </div>
                         <div className="text-[10px] text-slate-400">
-                          {user.email || 'No email'} · {user.city_location || '—'} · 🔥 {(!user.current_streak || user.current_streak === 5 || (user.total_xp ?? 0) < 200) ? 1 : user.current_streak}d streak
+                          {user.email || 'No email'} · {user.city_location || '—'} · 🔥 {user.current_streak ?? 1}d streak
                         </div>
                         <div className="text-[10px] text-slate-600">
                           Registered: {user.created_at ? new Date(user.created_at).toLocaleString() : '—'}
@@ -807,6 +815,17 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.activity_logs;`}
           </div>
         )}
       </div>
+
+      <ConfirmModal
+        isOpen={!!userToDelete}
+        onClose={() => setUserToDelete(null)}
+        onConfirm={confirmDeleteUser}
+        title="Delete User Account?"
+        description={`Are you sure you want to delete user "${userToDelete?.username}"? This will permanently erase their account and study data.`}
+        confirmText="Delete User"
+        cancelText="Cancel"
+        variant="danger"
+      />
     </div>
   );
 }

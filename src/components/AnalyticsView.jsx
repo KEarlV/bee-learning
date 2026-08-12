@@ -7,6 +7,7 @@ import BeeAnimatedMascot from './BeeAnimatedMascot';
 import { getSupabaseClient } from '../services/supabaseService';
 import { getStoredSession } from '../services/authService';
 import { logActivity } from '../services/activityLogService';
+import { calculateStreak } from '../utils/streakUtils';
 
 // ── XP → Level calculation ─────────────────────────────────
 // Level 1 = 0 XP, each level needs 100 more XP than last
@@ -161,8 +162,8 @@ export default function AnalyticsView() {
   const weeklyXp   = stats?.weekly_xp || 0;
   const { level, xpIntoLevel, xpNeeded } = xpToLevel(totalXp);
   const lvlPct     = Math.round((xpIntoLevel / xpNeeded) * 100);
-  const streak     = stats?.current_streak || 0;
-  const longestStreak = stats?.longest_streak || 0;
+  const streak     = calculateStreak(stats?.current_streak, stats?.last_active_date, stats?.created_at);
+  const longestStreak = Math.max(streak, stats?.longest_streak || 0);
   const mastered   = stats?.cards_mastered || 0;
   const examScore  = stats?.predicted_exam_score || 0;
   const tierInfo   = getTierInfo(totalXp);

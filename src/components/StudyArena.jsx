@@ -72,13 +72,12 @@ export default function StudyArena({ deck, cards = [], onFinishSession, onAskBee
   const handleRating = async (ratingScore) => {
     if (!currentCard) return;
 
-    // Rating XP Matrix:
-    // Easy (5): +10 XP
+    // Easy (5): +20 XP
     // Good (4): +15 XP
     // Hard (3): +5 XP
     // Again (1): 0 XP
     let xpGained = 0;
-    if (ratingScore === 5) xpGained = 10;
+    if (ratingScore === 5) xpGained = 20;
     else if (ratingScore === 4) xpGained = 15;
     else if (ratingScore === 3) xpGained = 5;
 
@@ -372,7 +371,7 @@ export default function StudyArena({ deck, cards = [], onFinishSession, onAskBee
             onClick={() => handleRating(5)}
             className="btn-primary text-xs justify-center py-3 font-bold"
           >
-            <CheckCircle2 size={15} /> Easy (+10 XP)
+            <CheckCircle2 size={15} /> Easy (+20 XP)
           </button>
         </div>
       ) : (

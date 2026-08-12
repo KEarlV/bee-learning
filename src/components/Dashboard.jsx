@@ -3,14 +3,24 @@ import { BookOpen, Sparkles, Trophy, Play, Plus, Flame, Heart, Clock, Trash2, Za
 import BeeAnimatedMascot from './BeeAnimatedMascot';
 import DailyQuests from './DailyQuests';
 import StreakCalendarModal from './StreakCalendarModal';
+import ConfirmModal from './ConfirmModal';
 import { getTierInfo } from '../utils/tierSystem';
+import { calculateStreak, getTimeUntilNextDay } from '../utils/streakUtils';
 import { db } from '../services/storageService';
 
 
 export default function Dashboard({ userStats, onStartSession, onOpenScan, onNavigateTab, onClaimXp }) {
   const [decks, setDecks] = useState([]);
   const [streakModalOpen, setStreakModalOpen] = useState(false);
+  const [deckToDelete, setDeckToDelete] = useState(null);
+  const [timeUntilNext, setTimeUntilNext] = useState(getTimeUntilNextDay());
 
+  useEffect(() => {
+    const timer = setInterval(() => setTimeUntilNext(getTimeUntilNextDay()), 30000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const currentStreak = calculateStreak(userStats?.currentStreak, userStats?.lastActiveDate, userStats?.createdAt);
 
   useEffect(() => {
     async function loadDecks() {
@@ -26,13 +36,17 @@ export default function Dashboard({ userStats, onStartSession, onOpenScan, onNav
     loadDecks();
   }, []);
 
-  const handleDeleteDeck = async (deckId, e) => {
+  const promptDeleteDeck = (deck, e) => {
     e.stopPropagation();
-    if (window.confirm('Delete this deck?')) {
-      await db.decks.delete(deckId);
-      await db.cards.where('deckId').equals(deckId).delete();
-      setDecks(decks.filter((d) => d.id !== deckId));
-    }
+    setDeckToDelete(deck);
+  };
+
+  const confirmDeleteDeck = async () => {
+    if (!deckToDelete) return;
+    await db.decks.delete(deckToDelete.id);
+    await db.cards.where('deckId').equals(deckToDelete.id).delete();
+    setDecks(decks.filter((d) => d.id !== deckToDelete.id));
+    setDeckToDelete(null);
   };
 
   return (
@@ -40,17 +54,20 @@ export default function Dashboard({ userStats, onStartSession, onOpenScan, onNav
       {/* Welcome Hero Banner */}
       <div className="glass-panel p-4 sm:p-5 border-sky-500/30 flex flex-col sm:flex-row items-center justify-between gap-3 relative overflow-hidden">
         <div className="space-y-2 text-center sm:text-left">
-          <div className="flex items-center justify-center sm:justify-start gap-2">
+          <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
             <span className="text-[10px] font-bold uppercase tracking-wider text-sky-400 bg-sky-500/10 px-2.5 py-0.5 rounded-full border border-sky-500/20">
               Daily Login Bonus Ready!
             </span>
             <button
               onClick={() => setStreakModalOpen(true)}
               className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20 hover:border-amber-400 flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+              title={`Next streak day in ${timeUntilNext.formatted}`}
             >
-              <Flame size={12} className="fill-amber-400" /> {userStats?.currentStreak ?? 1} Day Streak
+              <Flame size={12} className="fill-amber-400" /> {currentStreak} Day Streak
             </button>
-
+            <span className="text-[10px] text-amber-400/80 bg-slate-900/80 px-2 py-0.5 rounded-full border border-slate-800 flex items-center gap-1">
+              <Clock size={10} className="text-amber-400" /> Next reset in {timeUntilNext.formatted}
+            </span>
           </div>
 
           <h1 className="text-xl sm:text-2xl font-bold text-white font-display">
@@ -168,7 +185,7 @@ export default function Dashboard({ userStats, onStartSession, onOpenScan, onNav
                       {deck.subjectCategory}
                     </span>
                     <button
-                      onClick={(e) => handleDeleteDeck(deck.id, e)}
+                      onClick={(e) => promptDeleteDeck(deck, e)}
                       className="p-1 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-slate-800 opacity-0 group-hover:opacity-100 transition-opacity"
                       title="Delete Deck"
                     >
@@ -201,6 +218,17 @@ export default function Dashboard({ userStats, onStartSession, onOpenScan, onNav
         isOpen={streakModalOpen}
         onClose={() => setStreakModalOpen(false)}
         userStats={userStats}
+      />
+
+      <ConfirmModal
+        isOpen={!!deckToDelete}
+        onClose={() => setDeckToDelete(null)}
+        onConfirm={confirmDeleteDeck}
+        title="Delete Study Deck?"
+        description={`Are you sure you want to delete "${deckToDelete?.title || 'this deck'}"? All flashcards in this deck will be permanently removed.`}
+        confirmText="Delete Deck"
+        cancelText="Keep Deck"
+        variant="danger"
       />
     </div>
   );

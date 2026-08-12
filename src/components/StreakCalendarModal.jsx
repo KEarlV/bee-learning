@@ -1,15 +1,25 @@
-import React, { useState } from 'react';
-import { Flame, ShieldCheck, Calendar, ChevronLeft, ChevronRight, X, Trophy } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Flame, ShieldCheck, Calendar, ChevronLeft, ChevronRight, X, Trophy, Clock } from 'lucide-react';
 import BeeAnimatedMascot from './BeeAnimatedMascot';
+import { calculateStreak, getTimeUntilNextDay } from '../utils/streakUtils';
 
 export default function StreakCalendarModal({ isOpen, onClose, userStats }) {
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [timeUntilNext, setTimeUntilNext] = useState(getTimeUntilNextDay());
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const interval = setInterval(() => {
+      setTimeUntilNext(getTimeUntilNextDay());
+    }, 30000); // update every 30s
+    return () => clearInterval(interval);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
   const userXp = userStats?.totalXp ?? 0;
-  // If user has 0 XP or is newly registered, streak is 1 (Day 1 for today)
-  const currentStreak = (userXp === 0 || (userStats?.currentStreak === 5 && userXp < 100)) ? 1 : (userStats?.currentStreak ?? 1);
+  // Calculate synced streak accurately (handles newly registered users / consecutive days)
+  const currentStreak = calculateStreak(userStats?.currentStreak, userStats?.lastActiveDate, userStats?.createdAt);
   const longestStreak = userStats?.longestStreak ? Math.max(currentStreak, userStats.longestStreak) : currentStreak;
   const today = new Date();
 
@@ -71,6 +81,12 @@ export default function StreakCalendarModal({ isOpen, onClose, userStats }) {
           <p className="text-[11px] sm:text-xs text-slate-300 max-w-xs mx-auto">
             You're on fire! Study every day to keep your memory decay curve protected.
           </p>
+
+          {/* Subtle Next Streak Day Countdown Timer */}
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900/80 border border-slate-800 text-[10px] text-amber-300/80 font-medium">
+            <Clock size={11} className="text-amber-400 shrink-0" />
+            <span>Next streak day resets in <strong className="text-amber-300 font-bold">{timeUntilNext.formatted}</strong></span>
+          </div>
         </div>
 
         {/* Streak Protection Shield */}

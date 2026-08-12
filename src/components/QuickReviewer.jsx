@@ -36,14 +36,17 @@ export default function QuickReviewer({ onClose }) {
     setIsParsing(true);
 
     try {
-      const generated = await generateFlashcardsFromText(inputText, 4);
-      setCards(generated);
-      setInReviewSession(true);
-      setCurrentIndex(0);
-      setIsFlipped(false);
-      setTypedAnswer('');
-      setMcSubmitted(false);
-      setSelectedOption(null);
+      const result = await generateFlashcardsFromText(inputText, 4);
+      const generated = result?.cards || [];
+      if (generated.length > 0) {
+        setCards(generated);
+        setInReviewSession(true);
+        setCurrentIndex(0);
+        setIsFlipped(false);
+        setTypedAnswer('');
+        setMcSubmitted(false);
+        setSelectedOption(null);
+      }
     } catch (e) {
       console.error(e);
     } finally {

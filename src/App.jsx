@@ -16,6 +16,7 @@ import AdminPanel from './components/AdminPanel';
 import { getUserStats, updateUserStats, db } from './services/storageService';
 import { getStoredSession } from './services/authService';
 import { getSupabaseClient, getAdminSupabaseClient } from './services/supabaseService';
+import { calculateStreak } from './utils/streakUtils';
 
 const isAdminRoute = window.location.pathname === '/admin' || window.location.hash === '#/admin';
 
@@ -48,10 +49,22 @@ export default function App() {
           .maybeSingle();
 
         if (data) {
-          let streakVal = data.current_streak ?? 1;
-          if ((data.total_xp ?? 0) < 100 || streakVal === 5) {
-            streakVal = 1;
-            supabase.from('user_stats').update({ current_streak: 1, longest_streak: 1 }).eq('user_id', currentUser.userId);
+          const rawStreak = data.current_streak ?? 1;
+          const syncedStreak = calculateStreak(rawStreak, data.last_active_date, data.created_at);
+          const longestVal = Math.max(syncedStreak, data.longest_streak ?? 1);
+          const todayStr = new Date().toISOString().split('T')[0];
+
+          // Auto-persist synced streak to Supabase if updated
+          if (syncedStreak !== rawStreak || data.last_active_date !== todayStr) {
+            supabase
+              .from('user_stats')
+              .update({
+                current_streak: syncedStreak,
+                longest_streak: longestVal,
+                last_active_date: todayStr,
+              })
+              .eq('user_id', currentUser.userId)
+              .then(() => {});
           }
 
           setUserStats({
@@ -59,8 +72,8 @@ export default function App() {
             username: data.username,
             totalXp: data.total_xp ?? 0,
             weeklyXp: data.weekly_xp ?? 0,
-            currentStreak: streakVal,
-            longestStreak: Math.max(streakVal, data.longest_streak ?? 1),
+            currentStreak: syncedStreak,
+            longestStreak: longestVal,
             level: data.level ?? 1,
             cardsMastered: data.cards_mastered ?? 0,
             cardsStudiedToday: data.cards_studied_today ?? 0,

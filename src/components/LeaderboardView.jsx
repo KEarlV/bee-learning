@@ -1,27 +1,34 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Trophy, Flame, Zap, Globe, MapPin, Building, Loader2, RefreshCw } from 'lucide-react';
+import { Trophy, Flame, Zap, Globe, MapPin, Building, Loader2, RefreshCw, Award, Clock } from 'lucide-react';
 import BeeAnimatedMascot from './BeeAnimatedMascot';
 import { getSupabaseClient } from '../services/supabaseService';
 import { getStoredSession } from '../services/authService';
 import { getTierInfo } from '../utils/tierSystem';
+import { calculateStreak, getTimeUntilNextDay } from '../utils/streakUtils';
 
 const SCOPES = [
-  { id: 'local',         label: 'City',     icon: Building },
-  { id: 'national',      label: 'National', icon: MapPin   },
-  { id: 'international', label: 'World',    icon: Globe    },
+  { id: 'local',         label: 'Local (Pangasinan)', icon: MapPin },
+  { id: 'national',      label: 'Philippines',       icon: Award  },
+  { id: 'international', label: 'Global (World)',    icon: Globe  },
 ];
 
 const RANK_MEDAL = (r) =>
   r === 1 ? '🥇' : r === 2 ? '🥈' : r === 3 ? '🥉' : `#${r}`;
 
 export default function LeaderboardView() {
-  const [scope, setScope]       = useState('local');
+  const [scope, setScope]       = useState('international');
   const [entries, setEntries]   = useState([]);
   const [loading, setLoading]   = useState(true);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [timeUntilNext, setTimeUntilNext] = useState(getTimeUntilNextDay());
 
   const session = getStoredSession();
   const supabase = getSupabaseClient();
+
+  useEffect(() => {
+    const timer = setInterval(() => setTimeUntilNext(getTimeUntilNextDay()), 30000);
+    return () => clearInterval(timer);
+  }, []);
 
   // ── Fetch leaderboard from user_stats ──────────────────────
   const fetchLeaderboard = useCallback(async () => {
@@ -30,7 +37,7 @@ export default function LeaderboardView() {
 
     let query = supabase
       .from('user_stats')
-      .select('user_id, username, total_xp, weekly_xp, current_streak, city_location, country, account_status, role')
+      .select('user_id, username, total_xp, weekly_xp, current_streak, last_active_date, created_at, city_location, country, account_status, role')
       .eq('account_status', 'approved')
       .order('total_xp', { ascending: false })
       .limit(50);
@@ -55,8 +62,8 @@ export default function LeaderboardView() {
       setEntries(
         publicUsers.map((u, idx) => {
           const userXp = u.total_xp ?? 0;
-          let streak = u.current_streak ?? 1;
-          if (streak === 5 || userXp < 200 || streak > 30 || !streak) streak = 1;
+          // Calculate synced streak accurately for newly created users and returning daily users
+          const streak = calculateStreak(u.current_streak, u.last_active_date, u.created_at);
           return {
             rank:      idx + 1,
             userId:    u.user_id,
@@ -142,7 +149,14 @@ export default function LeaderboardView() {
       {/* Last updated + refresh */}
       {lastUpdated && (
         <div className="flex items-center justify-between text-[10px] text-slate-500 px-1">
-          <span>Updated {lastUpdated.toLocaleTimeString()}</span>
+          <div className="flex items-center gap-2">
+            <span>Updated {lastUpdated.toLocaleTimeString()}</span>
+            <span className="text-slate-700">•</span>
+            <span className="flex items-center gap-1 text-amber-400/80 font-medium">
+              <Clock size={10} className="shrink-0" />
+              Next streak day in {timeUntilNext.formatted}
+            </span>
+          </div>
           <button
             onClick={fetchLeaderboard}
             className="flex items-center gap-1 hover:text-slate-300 transition-colors"

@@ -1,9 +1,47 @@
 import React, { useState } from 'react';
-import { UploadCloud, Sparkles, CheckCircle2, Loader2, FileText, Image as ImageIcon } from 'lucide-react';
+import { UploadCloud, Sparkles, CheckCircle2, Loader2, FileText, Image as ImageIcon, AlertCircle, Key, X } from 'lucide-react';
 import BeeAnimatedMascot from './BeeAnimatedMascot';
-import { generateFlashcardsFromText } from '../services/geminiService';
+import { generateFlashcardsFromText, getApiKey, setApiKey } from '../services/geminiService';
 import { db } from '../services/storageService';
 import { logActivity } from '../services/activityLogService';
+
+const ERROR_MESSAGES = {
+  NO_API_KEY: {
+    title: 'No Gemini API Key Found',
+    desc: 'Please enter your Google Gemini API key below. Get a free key at aistudio.google.com.',
+    color: 'border-amber-500/40 bg-amber-500/10',
+    textColor: 'text-amber-300',
+    icon: Key,
+  },
+  INVALID_API_KEY: {
+    title: 'Invalid Gemini API Key',
+    desc: 'Your API key was rejected. Please check it at aistudio.google.com and enter the correct key.',
+    color: 'border-rose-500/40 bg-rose-500/10',
+    textColor: 'text-rose-300',
+    icon: AlertCircle,
+  },
+  ALL_MODELS_FAILED: {
+    title: 'Gemini API Unavailable',
+    desc: 'Could not reach the Gemini API. Check your internet connection or try again in a moment.',
+    color: 'border-rose-500/40 bg-rose-500/10',
+    textColor: 'text-rose-300',
+    icon: AlertCircle,
+  },
+  PARSE_ERROR: {
+    title: 'Response Parsing Error',
+    desc: 'Gemini returned an unexpected format. Please try again or use different content.',
+    color: 'border-amber-500/40 bg-amber-500/10',
+    textColor: 'text-amber-300',
+    icon: AlertCircle,
+  },
+  EMPTY_RESPONSE: {
+    title: 'No Cards Generated',
+    desc: 'Gemini could not extract study content from your file. Try uploading a different document or adding some text.',
+    color: 'border-amber-500/40 bg-amber-500/10',
+    textColor: 'text-amber-300',
+    icon: AlertCircle,
+  },
+};
 
 export default function FileScanner({ onDeckCreated }) {
   const [inputText, setInputText] = useState('');
@@ -12,6 +50,9 @@ export default function FileScanner({ onDeckCreated }) {
   const [generatedCards, setGeneratedCards] = useState([]);
   const [extractedFileMeta, setExtractedFileMeta] = useState(null);
   const [filePayload, setFilePayload] = useState(null);
+  const [scanError, setScanError] = useState(null);
+  const [apiKeyInput, setApiKeyInput] = useState('');
+  const [apiKeySaved, setApiKeySaved] = useState(false);
 
   const handleFileUpload = (e) => {
     const file = e.target.files?.[0];
@@ -44,20 +85,36 @@ export default function FileScanner({ onDeckCreated }) {
     }
   };
 
+  const handleSaveApiKey = () => {
+    const trimmed = apiKeyInput.trim();
+    if (!trimmed) return;
+    setApiKey(trimmed);
+    setApiKeySaved(true);
+    setScanError(null);
+    setTimeout(() => setApiKeySaved(false), 3000);
+  };
+
   const handleStartAiScan = async () => {
     if (!inputText.trim() && !filePayload) return;
     setIsScanning(true);
     setGeneratedCards([]);
+    setScanError(null);
 
     try {
-      const cards = await generateFlashcardsFromText(inputText, 5, filePayload);
-      setGeneratedCards(cards);
+      const result = await generateFlashcardsFromText(inputText, 5, filePayload);
+      const { cards, error } = result || {};
 
-      logActivity('AI Scan Completed', 'AI', {
-        tokens: cards.length * 10
-      });
+      if (error) {
+        setScanError(error);
+      } else if (cards && cards.length > 0) {
+        setGeneratedCards(cards);
+        logActivity('AI Scan Completed', 'AI', { tokens: cards.length * 10 });
+      } else {
+        setScanError('EMPTY_RESPONSE');
+      }
     } catch (err) {
       console.error('FileScanner scan error:', err);
+      setScanError('ALL_MODELS_FAILED');
     } finally {
       setIsScanning(false);
     }
@@ -104,6 +161,10 @@ export default function FileScanner({ onDeckCreated }) {
     }
   };
 
+  const errorInfo = scanError ? ERROR_MESSAGES[scanError] || ERROR_MESSAGES['ALL_MODELS_FAILED'] : null;
+  const needsApiKey = scanError === 'NO_API_KEY' || scanError === 'INVALID_API_KEY';
+  const currentKey = getApiKey();
+
   return (
     <div className="max-w-4xl mx-auto space-y-6 select-none">
       {/* Header Banner */}
@@ -111,14 +172,81 @@ export default function FileScanner({ onDeckCreated }) {
         <div>
           <div className="flex items-center gap-2">
             <Sparkles className="text-sky-400" size={24} />
-            <h2 className="text-2xl font-bold text-white font-display">AI Scan & Deck Studio</h2>
+            <h2 className="text-2xl font-bold text-white font-display">AI Scan &amp; Deck Studio</h2>
           </div>
           <p className="text-sm text-slate-400 mt-1">
-            Upload PDFs, handwritten notes, textbook scans, or paste text to auto-generate active recall cards with Gemini 2.5 Flash!
+            Upload PDFs, handwritten notes, textbook scans, or paste text to auto-generate active recall cards with Gemini AI!
           </p>
         </div>
         <BeeAnimatedMascot size="lg" animated={true} speechBubble="Bee is ready to scan!" />
       </div>
+
+      {/* API Key Status Banner (if no key configured) */}
+      {!currentKey && !scanError && (
+        <div className="glass-panel p-4 border-amber-500/30 bg-amber-500/5 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          <Key size={18} className="text-amber-400 shrink-0 mt-0.5 sm:mt-0" />
+          <div className="flex-1">
+            <p className="text-xs font-bold text-amber-300">Gemini API Key Required</p>
+            <p className="text-[11px] text-amber-400/80">Enter your Google Gemini API key to generate real AI flashcards from your documents. Get a free key at <strong>aistudio.google.com</strong>.</p>
+          </div>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <input
+              type="text"
+              value={apiKeyInput}
+              onChange={(e) => setApiKeyInput(e.target.value)}
+              placeholder="AIza..."
+              className="flex-1 sm:w-52 bg-slate-950 border border-amber-500/40 focus:border-amber-400 rounded-xl px-3 py-1.5 text-xs text-white outline-none"
+              onKeyDown={(e) => e.key === 'Enter' && handleSaveApiKey()}
+            />
+            <button
+              onClick={handleSaveApiKey}
+              className="btn-primary text-xs py-1.5 px-3 shrink-0"
+            >
+              {apiKeySaved ? <CheckCircle2 size={14} /> : 'Save Key'}
+              {apiKeySaved && ' Saved!'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Error Banner */}
+      {errorInfo && (
+        <div className={`glass-panel p-4 border ${errorInfo.color} flex flex-col gap-3`}>
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-start gap-2.5">
+              <errorInfo.icon size={18} className={`${errorInfo.textColor} shrink-0 mt-0.5`} />
+              <div>
+                <p className={`text-sm font-bold ${errorInfo.textColor}`}>{errorInfo.title}</p>
+                <p className="text-xs text-slate-400 mt-0.5">{errorInfo.desc}</p>
+              </div>
+            </div>
+            <button onClick={() => setScanError(null)} className="text-slate-500 hover:text-slate-300 shrink-0">
+              <X size={16} />
+            </button>
+          </div>
+
+          {/* Inline API key input for key errors */}
+          {needsApiKey && (
+            <div className="flex items-center gap-2 pt-1 border-t border-slate-800">
+              <Key size={14} className="text-slate-400 shrink-0" />
+              <input
+                type="text"
+                value={apiKeyInput}
+                onChange={(e) => setApiKeyInput(e.target.value)}
+                placeholder="Paste your Gemini API key (AIza...)"
+                className="flex-1 bg-slate-950 border border-slate-700 focus:border-sky-500 rounded-xl px-3 py-1.5 text-xs text-white outline-none"
+                onKeyDown={(e) => e.key === 'Enter' && handleSaveApiKey()}
+              />
+              <button
+                onClick={handleSaveApiKey}
+                className="btn-primary text-xs py-1.5 px-3 shrink-0"
+              >
+                {apiKeySaved ? '✓ Saved!' : 'Save & Retry'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Multimodal Dropzone & Text Area */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -150,7 +278,9 @@ export default function FileScanner({ onDeckCreated }) {
             {extractedFileMeta ? extractedFileMeta.name : 'Drag & Drop PDF or Image Scans'}
           </h3>
           <p className="text-xs text-slate-400 mb-3">
-            {extractedFileMeta ? `${extractedFileMeta.size} • Ready for AI processing` : 'Supports PDF, JPG/PNG Scans, Handwritten Notes, or Text Files'}
+            {extractedFileMeta
+              ? `${extractedFileMeta.size} • Ready for AI processing`
+              : 'Supports PDF, JPG/PNG Scans, Handwritten Notes, or Text Files'}
           </p>
           <span className="text-[11px] font-semibold text-sky-400 bg-sky-500/10 border border-sky-500/20 px-3 py-1 rounded-full">
             {extractedFileMeta ? 'Change File' : 'Browse File'}
@@ -221,10 +351,26 @@ export default function FileScanner({ onDeckCreated }) {
               <div key={idx} className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-sky-500/40 space-y-2">
                 <div className="flex items-center justify-between text-xs text-sky-400 font-bold uppercase">
                   <span>Card #{idx + 1} ({card.cardType || 'flashcard'})</span>
-                  <span className="text-amber-400 text-[10px]">✨ Gemini 1.5 Flash</span>
+                  <span className="text-amber-400 text-[10px]">✨ Gemini AI</span>
                 </div>
                 <p className="text-sm font-semibold text-slate-200">Q: {card.frontContent}</p>
                 <p className="text-xs text-slate-400 border-t border-slate-800 pt-2">A: {card.backContent}</p>
+                {card.options && (
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {card.options.map((opt, oi) => (
+                      <span
+                        key={oi}
+                        className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${
+                          opt.toLowerCase().trim() === (card.backContent || '').toLowerCase().trim()
+                            ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+                            : 'bg-slate-800 border-slate-700 text-slate-400'
+                        }`}
+                      >
+                        {opt}
+                      </span>
+                    ))}
+                  </div>
+                )}
                 {card.dynamicMnemonic && (
                   <p className="text-[11px] text-amber-300/90 italic bg-amber-500/10 p-2 rounded-lg border border-amber-500/20">
                     💡 Mnemonic: {card.dynamicMnemonic}

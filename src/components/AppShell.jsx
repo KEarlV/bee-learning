@@ -11,6 +11,7 @@ import OfflineBanner from './OfflineBanner';
 import LiveEventBanner from './LiveEventBanner';
 import MobileBottomNav from './MobileBottomNav';
 import { getTierInfo } from '../utils/tierSystem';
+import { calculateStreak, getTimeUntilNextDay } from '../utils/streakUtils';
 
 export default function AppShell({
   userStats,
@@ -30,6 +31,12 @@ export default function AppShell({
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [streakModalOpen, setStreakModalOpen] = useState(false);
+  const [timeUntilNext, setTimeUntilNext] = useState(getTimeUntilNextDay());
+
+  React.useEffect(() => {
+    const timer = setInterval(() => setTimeUntilNext(getTimeUntilNextDay()), 30000);
+    return () => clearInterval(timer);
+  }, []);
 
   const isLoggedIn = currentUser?.isAuthenticated && currentUser?.userId !== 'local_user';
 
@@ -41,7 +48,7 @@ export default function AppShell({
 
   const closeSidebar = () => setSidebarOpen(false);
   const userXp = userStats?.totalXp || 0;
-  const currentStreak = userStats?.currentStreak ?? 1;
+  const currentStreak = calculateStreak(userStats?.currentStreak, userStats?.lastActiveDate, userStats?.createdAt);
 
   const navItems = [
     { id: 'dashboard',   label: 'Dashboard',        icon: LayoutDashboard },
@@ -136,7 +143,7 @@ export default function AppShell({
           <button
             onClick={() => setStreakModalOpen(true)}
             className="hidden xs:flex items-center gap-1 bg-amber-500/15 border border-amber-500/30 hover:border-amber-400 text-amber-400 px-2.5 py-1 rounded-xl text-xs font-bold cursor-pointer transition-all active:scale-95"
-            title="View Streak Calendar"
+            title={`${currentStreak} Day Streak • Next streak day in ${timeUntilNext.formatted}`}
           >
             <Flame size={14} className="fill-amber-500 text-amber-500 shrink-0" />
             <span>{currentStreak}d</span>
