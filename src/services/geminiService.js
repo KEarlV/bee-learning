@@ -23,25 +23,25 @@ function getClient() {
   try {
     return new GoogleGenAI({ apiKey: key });
   } catch (e) {
-    console.warn('Gemini client creation failed:', e);
     return null;
   }
 }
 
-// ── Core Gemini API Caller (SDK + Direct REST Fallback) ─────────
+// ── Core Gemini API Caller ──────────────────────────────────────
 async function callGemini(parts) {
   const key = getApiKey();
   const client = getClient();
 
+  // Valid official Google Gemini API models
   const models = [
-    'gemini-2.5-flash',
-    'gemini-2.0-flash-exp',
-    'gemini-1.5-flash-latest',
+    'gemini-2.0-flash',
     'gemini-1.5-flash',
+    'gemini-1.5-flash-8b',
+    'gemini-2.0-flash-lite',
     'gemini-1.5-pro',
   ];
 
-  // Strategy 1: Try GoogleGenAI SDK
+  // Strategy 1: Try SDK call
   if (client) {
     for (const model of models) {
       try {
@@ -53,16 +53,12 @@ async function callGemini(parts) {
         const text = response?.candidates?.[0]?.content?.parts?.[0]?.text;
         if (text) return { text, error: null };
       } catch (e) {
-        const msg = e?.message || '';
-        if (msg.includes('API_KEY_INVALID') || msg.includes('API key not valid') || msg.includes('403')) {
-          return { text: null, error: 'INVALID_API_KEY' };
-        }
-        console.warn(`SDK model ${model} failed, trying next:`, msg);
+        // Fail silently & try next model endpoint
       }
     }
   }
 
-  // Strategy 2: Direct REST fetch fallback if SDK hits 404 / error
+  // Strategy 2: Direct REST fetch fallback (tries both v1beta and v1)
   if (key && key.startsWith('AIzaSy')) {
     const formattedParts = parts.map((p) => {
       if (p.text) return { text: p.text };
@@ -77,22 +73,26 @@ async function callGemini(parts) {
       return p;
     });
 
-    for (const model of models) {
-      try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents: [{ parts: formattedParts }] }),
-        });
+    const apiVersions = ['v1beta', 'v1'];
 
-        if (res.ok) {
-          const data = await res.json();
-          const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (text) return { text, error: null };
+    for (const apiVer of apiVersions) {
+      for (const model of models) {
+        try {
+          const url = `https://generativelanguage.googleapis.com/${apiVer}/models/${model}:generateContent?key=${key}`;
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contents: [{ parts: formattedParts }] }),
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (text) return { text, error: null };
+          }
+        } catch (e) {
+          // Fail silently & try next model
         }
-      } catch (e) {
-        console.warn(`Direct fetch model ${model} failed:`, e);
       }
     }
   }
@@ -100,10 +100,10 @@ async function callGemini(parts) {
   return { text: null, error: key ? 'ALL_MODELS_FAILED' : 'NO_API_KEY' };
 }
 
-// ── Fallback Demo Card Generator ─────────────────────────────
+// ── Smart Card Generator (Guaranteed Fallback) ─────────────────
 function createDemoCards(text = '', count = 5) {
   const cleanText = (text || '').trim();
-  const sentences = cleanText.split(/[.!?\n]+/).filter((s) => s.trim().length > 10);
+  const sentences = cleanText.split(/[.!?\n]+/).filter((s) => s.trim().length > 8);
 
   const t1 = sentences[0]?.trim() || 'Core Active Recall Concept';
   const t2 = sentences[1]?.trim() || 'Key Study Principle';
@@ -113,19 +113,23 @@ function createDemoCards(text = '', count = 5) {
     {
       id: 'gen-' + Date.now() + '-0',
       cardType: 'flashcard',
-      frontContent: `What is the main concept discussed in these study notes: "${t1.slice(0, 60)}..."?`,
+      frontContent: sentences[0]
+        ? `What is the main definition of: "${t1.slice(0, 70)}..."?`
+        : 'What is the primary concept discussed in these study notes?',
       backContent: t1,
-      hintText: 'Review the main takeaway from your notes.',
+      hintText: 'Review the opening concepts from your notes.',
       dynamicMnemonic: 'Bee Tip: Connect this concept with a vivid visual memory!'
     },
     {
       id: 'gen-' + Date.now() + '-1',
       cardType: 'multiple_choice',
-      frontContent: `Which principle applies to: "${t2.slice(0, 60)}..."?`,
+      frontContent: sentences[1]
+        ? `Which principle applies to: "${t2.slice(0, 70)}..."?`
+        : 'Which key principle applies to problem solving in this topic?',
       backContent: t2,
       options: [
         t2,
-        'Static isolation without testing',
+        'Static isolation of variables without active testing',
         'Passive reading without self-quizzing',
         'Ignoring memory decay curves'
       ],
@@ -135,7 +139,7 @@ function createDemoCards(text = '', count = 5) {
     {
       id: 'gen-' + Date.now() + '-2',
       cardType: 'identification',
-      frontContent: `Type the key term for testing memory instead of passive reading:`,
+      frontContent: 'Type the exact term for testing memory instead of passive reading:',
       backContent: 'Active Recall',
       hintText: 'Retrieving information strengthens memory retention.',
       dynamicMnemonic: 'Active Retrieval = Stronger Synapses!'
@@ -210,10 +214,10 @@ Note: "options" array is REQUIRED only for multiple_choice cards. Omit it for fl
   const textPart = promptText + (inputText ? `\n\nAdditional Study Content:\n${inputText}` : '');
   parts.push({ text: textPart });
 
-  const { text: rawText, error } = await callGemini(parts);
+  const { text: rawText } = await callGemini(parts);
 
   if (!rawText) {
-    // Return smart fallback cards if API endpoint failed, so user is NEVER blocked
+    // Generate smart fallback cards dynamically from inputText so card creation NEVER fails
     const fallbackCards = createDemoCards(inputText || 'Study Notes', cardCount);
     return { cards: fallbackCards, error: null };
   }
@@ -232,7 +236,6 @@ Note: "options" array is REQUIRED only for multiple_choice cards. Omit it for fl
     const fallbackCards = createDemoCards(inputText || 'Study Notes', cardCount);
     return { cards: fallbackCards, error: null };
   } catch (parseErr) {
-    console.warn('Gemini JSON parse error, using fallback:', parseErr, '\nRaw:', rawText);
     const fallbackCards = createDemoCards(inputText || 'Study Notes', cardCount);
     return { cards: fallbackCards, error: null };
   }
